@@ -111,6 +111,34 @@ integration/
 
 ---
 
+## Hosted demo
+
+A free-tier deployment runs at **https://po-cockpit.onrender.com** (Render, Singapore) against Supabase Postgres in the same region. `render.yaml` is the blueprint; [`DEPLOY.md`](DEPLOY.md) is the full runbook.
+
+### Re-baking the demo records
+
+```powershell
+node "$env:TEMP\cockpit-prebake\prebake2.mjs"
+```
+
+Cancels the existing records, uploads two sample POs, publishes them and waits for each to reach *Needs review*. Takes ~40 seconds and two extraction calls.
+
+It passes a duplicate-override reason deliberately: once a copy of a sample PDF has reached SAP, `FR-3.4` refuses to publish an identical file without a stated reason — which is every re-bake after the first successful run.
+
+**Why you need it:** Render's free plan has no persistent disk, so every deploy *and* every wake from its 15-minute idle sleep empties `storage/`. Records and the audit trail survive in Postgres; the PDFs do not, so the review screen's document pane breaks for older records.
+
+If `%TEMP%` has been cleared, regenerate the PDFs the script expects:
+
+```powershell
+$d = "$env:TEMP\cockpit-prebake"; mkdir $d -Force
+npm -w backend exec tsx scripts/makeSamplePo.ts -- "$d\po1.pdf" --vendor=northwind
+npm -w backend exec tsx scripts/makeSamplePo.ts -- "$d\po2.pdf" --vendor=mock
+```
+
+> **Pushing to `main` redeploys.** `render.yaml` sets `autoDeployTrigger: commit`, so any push wipes the PDFs and needs a re-bake afterwards. Turn Auto-Deploy off in the Render dashboard before a demo.
+
+---
+
 ## Configuration worth knowing
 
 | Variable | Default | Why it matters |
