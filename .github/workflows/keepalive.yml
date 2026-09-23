@@ -1,0 +1,57 @@
+# Keeps the free Render service awake.
+#
+# Render's free plan sleeps a service after ~15 minutes of no traffic, and waking
+# it is a container restart. That matters more than the 40-60s cold start: the
+# free plan has no persistent disk, so a restart empties /app/data/storage and
+# the PDFs behind pre-baked records disappear. Records and the audit trail live
+# in Supabase and survive; the document pane does not.
+#
+# Pinging /api/health every 10 minutes keeps the instance up, which keeps those
+# PDFs on disk.
+#
+# Costs: Render's free plan includes 750 instance-hours a month. Running one
+# service continuously is ~730, so this fits only while po-cockpit is the ONLY
+# free service in the account. Disable this workflow after the demo.
+
+name: keepalive
+
+on:
+  schedule:
+    # Every 10 minutes. GitHub queues scheduled runs on a best-effort basis and
+    # can be several minutes late under load, hence 10 rather than 14.
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping health endpoint
+        run: |
+          url="${{ vars.COCKPIT_URL || 'https://po-cockpit.onrender.com' }}/api/health"
+          echo "GET $url"
+
+          # --max-time 180 because a cold start takes 40-60s and this workflow
+          # is exactly what runs when the service has gone to sleep.
+          code=$(curl -sS -o body.json -w '%{http_code}' --max-time 180 "$url" || echo 000)
+
+          echo "HTTP $code"
+          cat body.json || true
+          echo
+
+          if [ "$code" != "200" ]; then
+            echo "::error::health check returned $code"
+            exit 1
+          fi
+
+          # ok:false means the service is up but a dependency is broken -
+          # most likely Supabase paused after 7 days idle.
+          if ! grep -q '"ok":true' body.json; then
+            echo "::error::service responded but reported ok:false"
+            exit 1
+          fi
