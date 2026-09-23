@@ -39,6 +39,17 @@ services:
         value: gemini-3.6-flash
       - key: CONFIDENCE_THRESHOLD
         value: "0.85"
+
+      # ---- cost controls on the Gemini key ----
+      # Retries fire only on retryable errors, so this is a worst-case cap:
+      # 2 = one retry for a transient blip, instead of two.
+      - key: EXTRACTION_MAX_ATTEMPTS
+        value: "2"
+      # 5 MB, down from the 20 MB default. Gemini bills PDFs per page, and the
+      # upload endpoint is reachable by anyone who finds the URL and the shared
+      # seed password — this bounds what a single call can cost. A real PO is 1-3 pages.
+      - key: MAX_UPLOAD_BYTES
+        value: "5242880"
       - key: SOD_REQUIRE_SEPARATE_APPROVER
         value: "true"
 
