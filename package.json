@@ -1,0 +1,22 @@
+{
+  "name": "ms-cockpit-simulation",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PO-to-SO Automation Cockpit",
+  "workspaces": ["backend", "frontend"],
+  "scripts": {
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres",
+    "setup": "npm install && npm run db:up && npm -w backend run prisma:migrate && npm -w backend run seed",
+    "dev": "concurrently -n api,web,sap -c blue,magenta,yellow \"npm -w backend run dev\" \"npm -w frontend run dev\" \"npm -w backend run sap:sim\"",
+    "dev:api": "npm -w backend run dev",
+    "dev:web": "npm -w frontend run dev",
+    "sap:sim": "npm -w backend run sap:sim",
+    "build": "npm -w backend run build && npm -w frontend run build",
+    "test": "npm -w backend run test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

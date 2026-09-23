@@ -1,0 +1,65 @@
+# Render Blueprint — free plan, no card required.
+#
+# One web service from the Dockerfile: API + workers + SPA + SAP simulator.
+# Postgres is external (Supabase free), because Render's own free Postgres
+# expires after 30 days and this database holds the audit trail.
+#
+# Deploy: Render dashboard -> New -> Blueprint -> pick this repo.
+# Then set the two `sync: false` values in the dashboard.
+
+services:
+  - type: web
+    name: po-cockpit
+    runtime: docker
+    plan: free
+    # Closest free region to India. Others: oregon, ohio, virginia, frankfurt.
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+
+    envVars:
+      # ---- set these in the dashboard (never commit them) ----
+      - key: DATABASE_URL
+        sync: false          # Supabase SESSION POOLER string — see DEPLOY.md step 3
+      - key: GEMINI_API_KEY
+        sync: false          # leave blank if EXTRACTION_PROVIDER=mock
+
+      # ---- generated once by Render, then stable ----
+      - key: JWT_SECRET
+        generateValue: true
+
+      # ---- app configuration ----
+      - key: NODE_ENV
+        value: production
+      - key: EXTRACTION_PROVIDER
+        value: gemini        # switch to `mock` for a zero-dependency demo
+      - key: GEMINI_MODEL
+        value: gemini-3.6-flash
+      - key: CONFIDENCE_THRESHOLD
+        value: "0.85"
+      - key: SOD_REQUIRE_SEPARATE_APPROVER
+        value: "true"
+
+      # Same-origin: the API serves the built SPA, so CORS never applies.
+      - key: WEB_ROOT
+        value: /app/frontend/dist
+
+      # Ephemeral disk on the free plan — fine for a demo, see DEPLOY.md "Limits".
+      - key: STORAGE_ROOT
+        value: /app/data/storage
+      - key: INTEGRATION_ROOT
+        value: /app/data/integration
+
+      # ---- demo-only: the simulator invents Sales Order numbers ----
+      - key: RUN_SAP_SIMULATOR
+        value: "true"
+      - key: SAP_SIM_ALLOW_IN_PRODUCTION
+        value: "true"
+      - key: SAP_SIM_FAILURE_RATE
+        value: "0.15"        # set 0 for a demo where nothing should fail
+
+      # Migrations are run from your laptop in step 4, not on boot.
+      - key: RUN_MIGRATIONS
+        value: "false"

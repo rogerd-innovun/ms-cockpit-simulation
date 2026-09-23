@@ -1,0 +1,330 @@
+// Physical schema for the PO-to-SO Automation Cockpit.
+// Entities and constraints follow docs/01-requirements.md §7.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// docs/01-requirements.md §4
+enum Role {
+  UPLOADER
+  APPROVER
+  OPERATIONS
+  ADMIN
+}
+
+/// docs/01-requirements.md §5.2
+enum POStatus {
+  DRAFT
+  PUBLISHED
+  PROCESSING
+  NEEDS_REVIEW
+  EXTRACTION_FAILED
+  APPROVED
+  SENT_TO_SAP
+  SO_CREATED
+  FAILED
+  CANCELLED
+}
+
+enum ExtractionOutcome {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum SapOutcome {
+  SUCCESS
+  ERROR
+}
+
+enum Severity {
+  BLOCKING
+  WARNING
+}
+
+enum ActorType {
+  USER
+  SYSTEM
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role
+  createdAt    DateTime @default(now())
+
+  uploadedRecords PORecord[]     @relation("uploader")
+  submissions     Submission[]   @relation("approver")
+  auditEvents     AuditEvent[]
+  edits           FieldExtraction[]
+  acks            ValidationAck[]
+}
+
+/// The central record. FR-1, FR-8.
+model PORecord {
+  id             String   @id @default(uuid())
+  /// FR-8.1 — derived from the internal id, never the vendor PO number. Immutable (INV-04).
+  correlationId  String   @unique
+  status         POStatus @default(DRAFT)
+  /// FR-8.4 — incremented per SAP submission so stale results can never match.
+  currentAttempt Int      @default(0)
+
+  vendorHint String?
+  notes      String?
+
+  uploadedById String
+  uploadedBy   User   @relation("uploader", fields: [uploadedById], references: [id])
+
+  /// FR-4.4 — which vendor profile (or generic fallback) produced the extraction.
+  vendorProfileId String?
+  vendorProfile   VendorProfile? @relation(fields: [vendorProfileId], references: [id])
+
+  /// Terminal outcome fields. FR-10.4, FR-11.1.
+  soNumber       String?
+  failureCode    String?
+  failureMessage String?
+
+  statusChangedAt DateTime  @default(now())
+  sentToSapAt     DateTime?
+  /// FR-2.3 — soft delete; audit trail survives (DM-04).
+  deletedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sourceDocument  SourceDocument?
+  header          POHeader?
+  extractionRuns  ExtractionRun[]
+  fieldExtractions FieldExtraction[]
+  submissions     Submission[]
+  sapResults      SapResult[]
+  auditEvents     AuditEvent[]
+  validationAcks  ValidationAck[]
+
+  @@index([status])
+  @@index([uploadedById])
+  @@index([createdAt])
+}
+
+/// The uploaded PDF. FR-1.
+model SourceDocument {
+  id               String   @id @default(uuid())
+  recordId         String   @unique
+  record           PORecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  originalFilename String
+  storagePath      String
+  mimeType         String
+  byteSize         Int
+  /// FR-1.4 — SHA-256, used for duplicate detection (FR-3.4) and integrity.
+  contentHash      String
+  pageCount        Int?
+  uploadedAt       DateTime @default(now())
+
+  @@index([contentHash])
+}
+
+/// One extraction attempt against the provider. FR-4.9, FR-4.15.
+model ExtractionRun {
+  id       String   @id @default(uuid())
+  recordId String
+  record   PORecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  attempt         Int
+  provider        String
+  model           String
+  promptVersion   String
+  vendorProfileId String?
+  outcome         ExtractionOutcome @default(PENDING)
+  latencyMs       Int?
+  inputTokens     Int?
+  outputTokens    Int?
+  /// FR-4.9 — raw response retained for debugging and prompt improvement.
+  rawResponse     Json?
+  errorMessage    String?
+  startedAt       DateTime          @default(now())
+  finishedAt      DateTime?
+
+  @@unique([recordId, attempt])
+  @@index([recordId])
+}
+
+/// Current header values used for validation and CSV generation. FR-5.2.
+model POHeader {
+  id       String   @id @default(uuid())
+  recordId String   @unique
+  record   PORecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  poNumber              String?
+  poDate                String?
+  customerName          String?
+  customerCode          String?
+  shipTo                String?
+  billTo                String?
+  requestedDeliveryDate String?
+  currency              String?
+  paymentTerms          String?
+  incoterms             String?
+  poTotalValue          String?
+  contact               String?
+
+  updatedAt DateTime @updatedAt
+
+  lineItems POLineItem[]
+}
+
+/// Line items. FR-5.3. DM-05 — at least one required at approval time.
+model POLineItem {
+  id       String   @id @default(uuid())
+  headerId String
+  header   POHeader @relation(fields: [headerId], references: [id], onDelete: Cascade)
+
+  lineNumber             Int
+  materialCode           String?
+  customerMaterialNumber String?
+  description            String?
+  quantity               String?
+  uom                    String?
+  unitPrice              String?
+  lineNetValue           String?
+  deliveryDate           String?
+  plant                  String?
+
+  @@unique([headerId, lineNumber])
+  @@index([headerId])
+}
+
+/// Per-field provenance: what the model said, what the human changed it to. FR-5.4.
+model FieldExtraction {
+  id       String   @id @default(uuid())
+  recordId String
+  record   PORecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  /// e.g. "header.poNumber" or "line.1.materialCode"
+  fieldPath      String
+  extractedValue String?
+  /// FR-4.8 — null for manually entered values (FR-5.7).
+  confidence     Float?
+  sourcePage     Int?
+  /// FR-7.4 — optional [x0,y0,x1,y1] normalised bounding box.
+  sourceBBox     Json?
+
+  editedById String?
+  editedBy   User?     @relation(fields: [editedById], references: [id])
+  editedAt   DateTime?
+
+  @@unique([recordId, fieldPath])
+  @@index([recordId])
+}
+
+/// FR-4.1, FR-4.5 — prompts are data, not code (NFR-6.1).
+model VendorProfile {
+  id                  String   @id @default(uuid())
+  name                String
+  version             Int      @default(1)
+  active              Boolean  @default(true)
+  /// Identification hints: sender names, tax ids, regex markers.
+  identificationHints Json
+  extractionPrompt    String
+  fieldMappings       Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  records PORecord[]
+
+  @@unique([name, version])
+}
+
+/// One handoff attempt to SAP. FR-9. DM-02 — one per (record, attempt).
+model Submission {
+  id       String   @id @default(uuid())
+  recordId String
+  record   PORecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  attempt Int
+
+  approvedById String
+  approvedBy   User     @relation("approver", fields: [approvedById], references: [id])
+  approvedAt   DateTime @default(now())
+  /// FR-7.10, DM-03 — immutable snapshot of exactly what was approved.
+  approvedSnapshot Json
+
+  outboundFilename String?
+  outboundPath     String?
+  byteSize         Int?
+  checksum         String?
+  writtenAt        DateTime?
+  writeError       String?
+
+  @@unique([recordId, attempt])
+  @@index([recordId])
+}
+
+/// One ingested SAP result file. FR-10.
+model SapResult {
+  id       String    @id @default(uuid())
+  recordId String?
+  record   PORecord? @relation(fields: [recordId], references: [id])
+
+  correlationId  String
+  attempt        Int?
+  outcome        SapOutcome
+  soNumber       String?
+  errorCode      String?
+  errorMessage   String?
+  sapTimestamp   String?
+  /// FR-10.11 — raw file content retained.
+  rawContent     String
+  sourceFilename String     @unique
+  /// FR-10.6, FR-10.7 — unmatched/unparseable files are quarantined, never deleted.
+  quarantined    Boolean    @default(false)
+  quarantineReason String?
+  ingestedAt     DateTime   @default(now())
+
+  @@index([correlationId])
+}
+
+/// FR-6.9 — which warnings a human explicitly accepted.
+model ValidationAck {
+  id       String   @id @default(uuid())
+  recordId String
+  record   PORecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  code      String
+  fieldPath String
+
+  acknowledgedById String
+  acknowledgedBy   User     @relation(fields: [acknowledgedById], references: [id])
+  acknowledgedAt   DateTime @default(now())
+
+  @@unique([recordId, code, fieldPath])
+}
+
+/// Append-only history. FR-13. Never cascade-deleted (DM-04).
+model AuditEvent {
+  id       String    @id @default(uuid())
+  recordId String?
+  record   PORecord? @relation(fields: [recordId], references: [id])
+
+  actorType ActorType
+  actorId   String?
+  actor     User?     @relation(fields: [actorId], references: [id])
+  /// Component name when actorType = SYSTEM.
+  actorName String?
+
+  eventType String
+  message   String?
+  before    Json?
+  after     Json?
+  timestamp DateTime @default(now())
+
+  @@index([recordId, timestamp])
+  @@index([eventType])
+}

@@ -1,0 +1,672 @@
+/* =============================================================================
+   PO-to-SO Automation Cockpit — "Proof sheet"
+
+   This is not a dashboard. The work is reconciliation: holding a document next
+   to what a machine read of it and marking the differences. So the page behaves
+   like an accountant's working paper — one sheet, hairline rules, a margin for
+   proof marks — rather than a tray of floating cards.
+
+   Two rules hold the whole thing together:
+     1. ONLY EXCEPTIONS ARE MARKED. A confident, unedited field says nothing at
+        all. Ink in the margin means a human needs to look.
+     2. No shadows, no filled panels, no rounded boxes. Structure comes from
+        rules and gutters.
+
+   Signal colours were validated with the dataviz palette validator against this
+   paper (#FFFFFF writing surface): lightness band, chroma floor, CVD separation,
+   normal-vision floor, contrast. Status always ships a glyph and a word as well
+   as a colour (NFR-4.4).
+   ============================================================================= */
+
+/* ---------------------------------------------------------------- tokens --- */
+
+:root {
+  --paper: #f5f7f6;          /* the desk */
+  --sheet: #ffffff;          /* the writing surface */
+  --wash: #eef1f0;           /* a tinted strip, used sparingly */
+  --rule: #dfe4e2;           /* hairline */
+  --rule-strong: #bfc8c5;
+  --rule-ink: #8b9794;
+
+  --ink: #14191a;
+  --ink-2: #4c585a;
+  --ink-3: #7f8b8d;
+
+  /* The correction mark. In proofing, red means "a person changed this or must". */
+  --mark: #b83227;
+
+  --sig-ok: #0e8c62;
+  --sig-info: #1c7cb8;
+  --sig-warn: #b5820a;
+  --sig-crit: #cc3a4c;
+  --sig-idle: #7d8a8c;
+
+  --font-display: 'Spectral', Georgia, 'Times New Roman', serif;
+  --font-ui: 'Archivo', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Cascadia Mono', Consolas, ui-monospace, monospace;
+
+  --bar-h: 52px;
+  --gutter: 26px;            /* the margin where proof marks live */
+  color-scheme: light;
+}
+
+/* A dark sheet for people working at night. Same language, inverted stock. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper: #14191a;
+    --sheet: #1a2122;
+    --wash: #212a2b;
+    --rule: #2c3738;
+    --rule-strong: #445052;
+    --rule-ink: #6c7a7c;
+
+    --ink: #eef2f1;
+    --ink-2: #a8b5b4;
+    --ink-3: #798687;
+
+    --mark: #e8705f;
+
+    --sig-ok: #1e9e74;
+    --sig-info: #3d8fd8;
+    --sig-warn: #c89416;
+    --sig-crit: #dd4f63;
+    --sig-idle: #7d8a8c;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --paper: #14191a;
+  --sheet: #1a2122;
+  --wash: #212a2b;
+  --rule: #2c3738;
+  --rule-strong: #445052;
+  --rule-ink: #6c7a7c;
+
+  --ink: #eef2f1;
+  --ink-2: #a8b5b4;
+  --ink-3: #798687;
+
+  --mark: #e8705f;
+
+  --sig-ok: #1e9e74;
+  --sig-info: #3d8fd8;
+  --sig-warn: #c89416;
+  --sig-crit: #dd4f63;
+  --sig-idle: #7d8a8c;
+  color-scheme: dark;
+}
+
+.t-ok { --tone: var(--sig-ok); }
+.t-info { --tone: var(--sig-info); }
+.t-warn { --tone: var(--sig-warn); }
+.t-crit { --tone: var(--sig-crit); }
+.t-idle { --tone: var(--sig-idle); }
+
+/* ------------------------------------------------------------------ base --- */
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { margin: 0; font-weight: 600; }
+h1 {
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 1.12;
+  letter-spacing: -0.012em;
+  text-wrap: balance;
+}
+h2 { font-family: var(--font-ui); font-size: 15px; font-weight: 600; }
+p { margin: 0; }
+
+a { color: var(--ink); text-underline-offset: 2px; text-decoration-color: var(--rule-strong); }
+a:hover { text-decoration-color: currentColor; }
+
+:focus-visible { outline: 2px solid var(--sig-info); outline-offset: 1px; }
+::selection { background: color-mix(in srgb, var(--sig-info) 22%, transparent); }
+
+.mono { font-family: var(--font-mono); font-size: 0.9em; }
+.tnum { font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-2); }
+.faint { color: var(--ink-3); }
+.spacer { flex: 1; }
+.serif { font-family: var(--font-display); }
+
+/* A caption. Sentence case — not another row of shouting uppercase labels. */
+.cap { font-size: 11.5px; color: var(--ink-3); letter-spacing: 0.005em; }
+
+.empty { padding: 46px 20px; text-align: center; color: var(--ink-3); font-size: 13px; }
+
+/* ------------------------------------------------------------------ shell --- */
+
+.app { min-height: 100%; display: flex; flex-direction: column; }
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  height: var(--bar-h);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 22px;
+  background: var(--sheet);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.brand { display: inline-flex; align-items: baseline; gap: 9px; text-decoration: none; color: var(--ink); }
+.brand-name { font-family: var(--font-display); font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.brand-sub { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); }
+
+.who { display: flex; align-items: baseline; gap: 7px; font-size: 12.5px; white-space: nowrap; }
+.who b { font-weight: 600; }
+.who .role { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); }
+
+.page { flex: 1; padding: 0 0 70px; }
+.sheet {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 0 22px;
+}
+
+/* ------------------------------------------------------------------- head --- */
+
+.head { padding: 26px 0 0; }
+.head-row { display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+.head h1 + .cap { margin-top: 5px; }
+.head::after {
+  content: '';
+  display: block;
+  height: 1px;
+  background: var(--ink);
+  opacity: 0.85;
+  margin-top: 16px;
+}
+
+.actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ---------------------------------------------------------------- controls --- */
+
+button {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 110ms ease, border-color 110ms ease, color 110ms ease;
+}
+button:hover:not(:disabled) { background: var(--wash); border-color: var(--ink-3); }
+button:active:not(:disabled) { background: var(--rule); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+button.primary { background: var(--ink); color: var(--sheet); border-color: var(--ink); font-weight: 600; }
+button.primary:hover:not(:disabled) { background: var(--ink-2); border-color: var(--ink-2); }
+button.quiet { border-color: transparent; color: var(--ink-2); padding: 6px 8px; }
+button.quiet:hover:not(:disabled) { background: var(--wash); color: var(--ink); }
+button.danger { color: var(--mark); border-color: color-mix(in srgb, var(--mark) 45%, transparent); }
+button.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--mark) 10%, transparent); border-color: var(--mark); }
+button.sm { padding: 2px 7px; font-size: 11.5px; }
+
+input, textarea {
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule-strong);
+  border-radius: 0;
+  padding: 4px 2px;
+  width: 100%;
+  transition: border-color 110ms ease, background 110ms ease;
+}
+input:hover:not(:disabled) { border-bottom-color: var(--ink-3); background: var(--wash); }
+input:focus { outline: none; border-bottom-color: var(--ink); border-bottom-width: 2px; padding-bottom: 3px; background: var(--wash); }
+input:disabled { color: var(--ink-2); border-bottom-style: dotted; cursor: default; }
+input::placeholder { color: var(--ink-3); }
+
+/* the one boxed input: search reads as a control, not a form field */
+.search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  padding: 0 9px;
+  background: var(--sheet);
+  max-width: 400px;
+  flex: 1;
+}
+.search:focus-within { border-color: var(--ink); }
+.search input { border: 0; padding: 6px 0; }
+.search input:hover, .search input:focus { background: transparent; border: 0; padding: 6px 0; }
+
+kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  border: 1px solid var(--rule-strong);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--ink-2);
+  background: var(--sheet);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ state --- */
+
+/* A state is a lamp, a glyph and a word — never colour alone. */
+.state {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.state .lamp {
+  width: 8px; height: 8px; flex: none;
+  background: var(--tone, var(--sig-idle));
+  align-self: center;
+}
+.state .glyph { font-family: var(--font-mono); font-size: 10px; color: var(--tone, var(--ink-3)); }
+
+.count-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+  border: 1px solid var(--rule);
+  padding: 0 5px;
+  border-radius: 2px;
+}
+
+/* ------------------------------------------------------------- tab rule --- */
+
+.tabrule {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+  border-bottom: 1px solid var(--rule-strong);
+  margin: 18px 0 0;
+  overflow-x: auto;
+}
+.tab {
+  appearance: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  padding: 9px 15px 8px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 110ms ease, border-color 110ms ease, background 110ms ease;
+}
+.tab:hover { color: var(--ink); background: var(--wash); }
+.tab .n {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+.tab .lamp { width: 7px; height: 7px; background: var(--tone, var(--sig-idle)); align-self: center; }
+.tab[aria-pressed='true'] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+.tab[aria-pressed='true'] .n { color: var(--ink); }
+
+/* ----------------------------------------------------------------- ledger --- */
+
+/* Its own scroll pane, so the header can stick to the top of the ledger rather
+   than to the viewport — a sticky offset of --bar-h inside a scroll container
+   pushes the header *down into* the rows and buries the first one. */
+.ledger-wrap {
+  overflow: auto;
+  max-height: calc(100vh - 250px);
+  background: var(--sheet);
+  border-bottom: 1px solid var(--rule-strong);
+}
+table.ledger { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+table.ledger thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  text-align: left;
+  padding: 7px 12px;
+  background: var(--sheet);
+  border-bottom: 1px solid var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+table.ledger thead th.sortable { cursor: pointer; user-select: none; }
+table.ledger thead th.sortable:hover { color: var(--ink); background: var(--wash); }
+table.ledger thead th .dir { font-family: var(--font-mono); font-size: 9px; margin-left: 4px; color: var(--ink-3); }
+table.ledger thead th[aria-sort] .dir { color: var(--ink); }
+
+table.ledger tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--rule);
+  /* column rules — the thing that makes a ledger read as a ledger */
+  border-right: 1px solid var(--rule);
+  vertical-align: baseline;
+}
+table.ledger tbody td:last-child { border-right: 0; }
+table.ledger th.num, table.ledger td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+table.ledger tbody tr { cursor: pointer; }
+table.ledger tbody tr:hover td { background: var(--wash); }
+table.ledger tbody tr:focus-visible { outline: 2px solid var(--sig-info); outline-offset: -2px; }
+/* Only rows that want a human carry a mark. Everything else stays quiet. */
+table.ledger tbody tr.flagged td:first-child { box-shadow: inset 3px 0 0 var(--tone, var(--mark)); }
+
+.sub { display: block; font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+
+/* ------------------------------------------------------------- dropzone --- */
+
+.dropzone { position: relative; }
+.dropzone.over::after {
+  content: 'Drop the PO PDF to upload';
+  position: fixed;
+  inset: var(--bar-h) 0 0 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--paper) 90%, transparent);
+  border: 2px dashed var(--ink);
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------------------- record --- */
+
+.rec-head { display: flex; align-items: flex-start; gap: 18px; flex-wrap: wrap; padding-top: 22px; }
+.rec-title {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  /* Not tighter than this: below ~1.1 the glyph box overflows the line box and
+     Chrome hit-tests the text over whatever sits above it — which silently ate
+     clicks on the Worklist link. */
+  line-height: 1.15;
+  margin-top: 4px;
+}
+.rec-corr { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-3); margin-top: 6px; }
+.rec-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  /* the interactive row always wins hit-testing against display type below it */
+  position: relative;
+  z-index: 1;
+}
+
+/* the lifecycle, as a ruled line with ticks rather than a widget */
+.rail { display: flex; align-items: stretch; margin: 18px 0 0; border-top: 1px solid var(--rule-strong); border-bottom: 1px solid var(--rule-strong); }
+.rail-step { flex: 1 1 0; min-width: 86px; padding: 9px 10px 9px 0; position: relative; }
+.rail-step + .rail-step { padding-left: 12px; border-left: 1px solid var(--rule); }
+.rail-tick { display: block; width: 9px; height: 9px; margin-bottom: 6px; border: 1px solid var(--rule-ink); }
+.rail-step.done .rail-tick { background: var(--sig-ok); border-color: var(--sig-ok); }
+.rail-step.at .rail-tick { background: var(--tone); border-color: var(--tone); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 20%, transparent); }
+.rail-label { font-size: 11.5px; color: var(--ink-3); }
+.rail-step.done .rail-label { color: var(--ink-2); }
+.rail-step.at .rail-label { color: var(--ink); font-weight: 600; }
+
+/* --------------------------------------------------------------- the split --- */
+
+.split { display: grid; grid-template-columns: var(--split, 42%) 7px 1fr; align-items: start; margin-top: 18px; }
+@media (max-width: 1040px) { .split { grid-template-columns: 1fr; } .split-handle { display: none; } }
+
+.split-handle {
+  align-self: stretch;
+  cursor: col-resize;
+  position: relative;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  touch-action: none;   /* so a touch drag resizes instead of scrolling */
+}
+.split-handle::before {
+  content: '';
+  position: absolute;
+  inset: 0 3px;
+  background: var(--rule-strong);
+  transition: background 110ms ease;
+}
+.split-handle:hover::before, .split-handle:active::before { background: var(--ink); }
+
+.doc { position: sticky; top: calc(var(--bar-h) + 10px); border: 1px solid var(--rule-strong); background: var(--sheet); }
+.doc-bar { display: flex; align-items: baseline; gap: 9px; padding: 7px 10px; border-bottom: 1px solid var(--rule); font-size: 11.5px; }
+.doc iframe { width: 100%; height: min(76vh, 920px); border: 0; display: block; background: var(--wash); }
+
+.reading { padding-left: 18px; min-width: 0; }
+@media (max-width: 1040px) { .reading { padding-left: 0; padding-top: 18px; } }
+
+/* -------------------------------------------------------------- sections --- */
+
+.sec { border-top: 1px solid var(--ink); padding-top: 9px; margin-top: 26px; }
+.sec:first-child { margin-top: 0; }
+.sec-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.sec-head h2 { font-size: 13px; letter-spacing: 0.01em; }
+
+/* --------------------------------------------------------------- fieldrow --- */
+
+/* Label, then a ruled line to write on, with a margin for the proof mark.
+   A confident, untouched field carries no mark at all. */
+.fieldset { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0 26px; }
+.fieldset.wide { grid-template-columns: 1fr; }
+
+.fieldrow {
+  display: grid;
+  grid-template-columns: var(--gutter) 1fr;
+  align-items: baseline;
+  gap: 0 8px;
+  padding: 9px 0 7px;
+  border-bottom: 1px dotted var(--rule);
+  min-width: 0;
+}
+.fieldrow .gut { align-self: center; min-height: 1px; }
+.fieldrow .body { min-width: 0; }
+.fieldrow label { display: block; font-size: 11px; color: var(--ink-3); margin-bottom: 1px; }
+.fieldrow.flag { background: color-mix(in srgb, var(--tone, var(--mark)) 5%, transparent); }
+.fieldrow.flag label { color: var(--ink-2); }
+
+/* the proof mark itself */
+.mark {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--tone, var(--mark));
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  cursor: help;
+}
+.mark-pct { font-variant-numeric: tabular-nums; }
+
+.was {
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-top: 2px;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.was s { text-decoration-thickness: 1px; }
+/* clicking the model's original value puts it back — provenance you can act on */
+button.restore {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  border: 0;
+  border-bottom: 1px dashed var(--rule-strong);
+  border-radius: 0;
+  padding: 0 1px;
+  color: var(--ink-2);
+  background: transparent;
+}
+button.restore:hover:not(:disabled) { color: var(--mark); border-bottom-color: var(--mark); background: transparent; }
+
+.note { font-size: 11.5px; margin-top: 3px; color: var(--tone, var(--ink-3)); }
+
+/* ------------------------------------------------------------------ notice --- */
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 0 10px 13px;
+  border-left: 3px solid var(--tone, var(--rule-strong));
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.notice b { color: var(--ink); font-weight: 600; font-size: 13px; }
+.notice .raw { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); }
+.notice-stack { display: flex; flex-direction: column; gap: 2px; margin-top: 16px; }
+
+/* ------------------------------------------------------------------ issues --- */
+
+.issues { list-style: none; margin: 0; padding: 0; }
+.issues li {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 7px 0;
+  border-bottom: 1px dotted var(--rule);
+  font-size: 12.5px;
+}
+.issues li .glyph { font-family: var(--font-mono); font-size: 10px; color: var(--tone); }
+.issues li.done { color: var(--ink-3); }
+.issues a { color: inherit; }
+
+/* ------------------------------------------------------------ line ledger --- */
+
+.lines { overflow-x: auto; }
+table.lines { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 880px; }
+table.lines th {
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  padding: 5px 7px;
+  border-bottom: 1px solid var(--ink);
+  white-space: nowrap;
+}
+table.lines td { padding: 2px 7px; border-bottom: 1px solid var(--rule); border-right: 1px solid var(--rule); }
+table.lines td:last-child { border-right: 0; }
+table.lines th.num, table.lines td.num { text-align: right; }
+table.lines input { font-size: 12px; padding: 3px 2px; border-bottom-color: transparent; }
+table.lines tr:hover input:not(:disabled) { border-bottom-color: var(--rule-strong); }
+table.lines .rownum { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); }
+table.lines td.cell-flag { background: color-mix(in srgb, var(--mark) 7%, transparent); }
+
+/* ------------------------------------------------------------------- kv --- */
+
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 7px 20px; margin: 0; font-size: 12.5px; }
+.kv dt { color: var(--ink-3); font-size: 11.5px; }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+
+/* -------------------------------------------------------------- timeline --- */
+
+.trail { list-style: none; margin: 0; padding: 0; }
+.trail li { display: grid; grid-template-columns: 74px 1fr; gap: 14px; padding: 6px 0; border-bottom: 1px dotted var(--rule); font-size: 12.5px; }
+.trail time { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.trail .ev { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-3); }
+.trail .msg { color: var(--ink); }
+
+/* ------------------------------------------------------------------ login --- */
+
+.login { min-height: 100%; display: grid; grid-template-columns: 1fr 440px; }
+@media (max-width: 900px) { .login { grid-template-columns: 1fr; } .login-left { display: none; } }
+
+.login-left { padding: 52px; display: flex; flex-direction: column; justify-content: space-between; background: var(--sheet); border-right: 1px solid var(--rule-strong); }
+.login-left h1 { font-size: clamp(30px, 3.6vw, 46px); max-width: 16ch; }
+.login-left h1 em { font-style: italic; color: var(--mark); }
+.lede { margin-top: 16px; max-width: 48ch; font-size: 14.5px; color: var(--ink-2); font-family: var(--font-display); }
+
+/* the pipeline as numbered marginalia, because it genuinely is a sequence */
+.steps { margin-top: 36px; border-top: 1px solid var(--ink); }
+.step { display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: baseline; padding: 11px 0; border-bottom: 1px dotted var(--rule); }
+.step .no { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); }
+.step .what { font-size: 13.5px; }
+.step .how { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-3); }
+.step.hot .no { color: var(--mark); font-weight: 600; }
+.step.hot .what { font-weight: 600; }
+
+.login-right { display: flex; align-items: center; padding: 40px 34px; }
+.login-form { width: 100%; }
+.login-form h2 { font-family: var(--font-display); font-size: 20px; margin-bottom: 18px; }
+.accounts { margin-top: 20px; border-top: 1px solid var(--rule-strong); padding-top: 12px; }
+.account {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px dotted var(--rule);
+  border-radius: 0;
+  padding: 7px 2px;
+  font-size: 12.5px;
+}
+.account:hover:not(:disabled) { background: var(--wash); }
+.account[aria-pressed='true'] { background: transparent; box-shadow: inset 3px 0 0 var(--ink); padding-left: 9px; }
+.account .mail { font-family: var(--font-mono); font-size: 11.5px; }
+.account .cando { font-size: 10.5px; color: var(--ink-3); }
+
+.err { font-size: 12.5px; color: var(--mark); border-left: 3px solid var(--mark); padding: 7px 0 7px 11px; margin-top: 12px; }
+
+/* ------------------------------------------------------------- shortcuts --- */
+
+.keys { position: fixed; right: 18px; bottom: 18px; z-index: 50; }
+.keysheet {
+  position: fixed;
+  right: 18px;
+  bottom: 60px;
+  z-index: 50;
+  width: 280px;
+  background: var(--sheet);
+  border: 1px solid var(--ink);
+  padding: 13px 15px;
+}
+.keysheet h3 { font-family: var(--font-display); font-size: 15px; margin-bottom: 9px; }
+.keysheet dl { display: grid; grid-template-columns: auto 1fr; gap: 7px 12px; margin: 0; font-size: 12px; align-items: baseline; }
+.keysheet dd { margin: 0; color: var(--ink-2); }
+
+/* the field the keyboard is currently on */
+.fieldrow.cursor { box-shadow: inset 3px 0 0 var(--ink); }
+.fieldrow.cursor label { color: var(--ink); font-weight: 600; }
+
+/* -------------------------------------------------------- reduced motion --- */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

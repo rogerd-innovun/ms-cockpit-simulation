@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="Review extracted purchase orders and approve them for Sales Order creation in SAP S/4HANA." />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Spectral:ital,wght@0,400;0,600;0,700;1,400&display=swap"
+    />
+
+    <!-- A proof mark in the margin of a sheet. -->
+    <link
+      rel="icon"
+      href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="%23F7F8F7"/><rect x="6" y="5" width="20" height="22" fill="%23fff" stroke="%23C2CAC7"/><path d="M9 11h8M9 15h14M9 19h11" stroke="%23828E90" stroke-width="1.6"/><path d="M19 22l3 3 6-7" stroke="%23C0392B" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    />
+
+    <title>PO-to-SO Cockpit</title>
+
+    <script>
+      // Resolve the theme before first paint. Light is this tool's designed case;
+      // dark is offered, but only an explicit choice or an OS dark preference gets it.
+      (function () {
+        try {
+          var stored = localStorage.getItem('cockpit.theme');
+          var theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

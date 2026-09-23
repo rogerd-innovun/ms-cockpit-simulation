@@ -1,0 +1,20 @@
+node_modules
+**/node_modules
+backend/dist
+frontend/dist
+frontend/tsconfig.tsbuildinfo
+
+# Never bake local state or secrets into the image.
+.env
+**/.env
+!.env.example
+backend/storage
+backend/integration
+**/.vite
+**/.vite-temp
+
+.git
+.gitignore
+*.log
+.DS_Store
+__MACOSX
