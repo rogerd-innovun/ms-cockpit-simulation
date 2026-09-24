@@ -1,5 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
+import multer from 'multer';
 import { ZodError } from 'zod';
+import { env } from '../config/env.js';
 import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 
@@ -11,6 +13,19 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   if (err instanceof AppError) {
     res.status(err.status).json({
       error: { code: err.code, message: err.message, details: err.details },
+    });
+    return;
+  }
+
+  // Multer rejects before the route handler runs, so without this an oversized
+  // upload surfaces as a bare 500 rather than telling the user what the limit is.
+  if (err instanceof multer.MulterError) {
+    const message =
+      err.code === 'LIMIT_FILE_SIZE'
+        ? `The file is larger than the ${(env.MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(0)} MB upload limit.`
+        : `Upload rejected: ${err.message}.`;
+    res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({
+      error: { code: err.code, message },
     });
     return;
   }

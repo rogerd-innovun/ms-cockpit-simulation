@@ -1,13 +1,11 @@
 # Keeps the free Render service awake.
 #
 # Render's free plan sleeps a service after ~15 minutes of no traffic, and waking
-# it is a container restart. That matters more than the 40-60s cold start: the
-# free plan has no persistent disk, so a restart empties /app/data/storage and
-# the PDFs behind pre-baked records disappear. Records and the audit trail live
-# in Supabase and survive; the document pane does not.
-#
-# Pinging /api/health every 10 minutes keeps the instance up, which keeps those
-# PDFs on disk.
+# it is a container restart with a 40-60s cold start. PDFs now survive restarts
+# (they live in Postgres; the disk is only a cache), so this exists purely to
+# spare visitors that cold start — and to notice a paused Supabase before a demo
+# does. Anything in flight in integration/ is still lost on a restart; the SLA
+# sweep turns such records into a clean Failed rather than a hang.
 #
 # Costs: Render's free plan includes 750 instance-hours a month. Running one
 # service continuously is ~730, so this fits only while po-cockpit is the ONLY

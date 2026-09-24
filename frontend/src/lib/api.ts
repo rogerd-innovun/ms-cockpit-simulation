@@ -30,6 +30,17 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * A 401 on anything but the login call means the session died (the JWT lasts 12h).
+ * Without this, an expired token masquerades as "Record not found" or an empty
+ * worklist. Clearing the token and reloading lands cleanly on the sign-in page.
+ */
+function expireSession(): never {
+  setToken(null);
+  window.location.assign('/');
+  throw new ApiError(401, 'Your session has expired. Sign in again.', 'SESSION_EXPIRED');
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers = new Headers(init.headers);
@@ -39,6 +50,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   const res = await fetch(`/api${path}`, { ...init, headers });
+  if (res.status === 401 && path !== '/auth/login' && token) expireSession();
 
   if (res.status === 204) return undefined as T;
 
@@ -136,6 +148,7 @@ export const api = {
     const res = await fetch(`/api/records/${id}/document`, {
       headers: { Authorization: `Bearer ${getToken() ?? ''}` },
     });
+    if (res.status === 401 && getToken()) expireSession();
     if (!res.ok) {
       let message = 'Could not load the PDF.';
       try {

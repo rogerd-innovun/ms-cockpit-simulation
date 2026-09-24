@@ -39,6 +39,8 @@ const keyOf = (r: WorklistRow, k: SortKey): string | number => {
 export function WorklistPage() {
   const [view, setView] = useState('all');
   const [q, setQ] = useState('');
+  // The query fires on the debounced value, not per keystroke.
+  const [debouncedQ, setDebouncedQ] = useState('');
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'age', dir: -1 });
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [over, setOver] = useState(false);
@@ -49,9 +51,15 @@ export function WorklistPage() {
 
   const active = VIEWS.find((v) => v.key === view)!;
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q), 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
   const list = useQuery({
-    queryKey: ['records', view, q],
-    queryFn: () => api.list({ status: active.statuses?.join(','), mine: active.mine, q: q || undefined }),
+    queryKey: ['records', view, debouncedQ],
+    queryFn: () =>
+      api.list({ status: active.statuses?.join(','), mine: active.mine, q: debouncedQ || undefined }),
     // FR-12.7 — statuses move on their own, so the list refreshes itself.
     refetchInterval: 4000,
   });
@@ -118,11 +126,49 @@ export function WorklistPage() {
   const takeFile = (file?: File | null) => {
     setUploadError(null);
     if (!file) return;
-    if (file.type !== 'application/pdf') {
+    // Some sources drop files with an empty MIME type; the server validates the
+    // actual content, so only refuse a file that positively claims to be something else.
+    if (file.type && file.type !== 'application/pdf') {
       setUploadError(`${file.name} is not a PDF.`);
       return;
     }
     upload.mutate(file);
+  };
+
+  /** FR-12.6 — export exactly what is on screen: current view, search and sort. */
+  const exportCsv = () => {
+    const esc = (v: string | null | undefined) => {
+      const s = (v ?? '').replace(/\r?\n/g, ' ');
+      return /[",]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = [
+      'Status,PO number,Customer,Customer code,Lines,Value,Currency,SO number,Uploaded by,File,Correlation id,Status changed',
+      ...rows.map((r) =>
+        [
+          r.status,
+          r.header?.poNumber,
+          r.header?.customerName,
+          r.header?.customerCode,
+          String(r.header?._count.lineItems ?? 0),
+          r.header?.poTotalValue,
+          r.header?.currency,
+          r.soNumber,
+          r.uploadedBy.name,
+          r.sourceDocument?.originalFilename,
+          r.correlationId,
+          r.statusChangedAt,
+        ]
+          .map(esc)
+          .join(','),
+      ),
+    ];
+    // The BOM makes Excel read the file as UTF-8 instead of the local codepage.
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `worklist-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   return (
@@ -150,6 +196,14 @@ export function WorklistPage() {
                 hidden
                 onChange={(e) => { takeFile(e.target.files?.[0]); e.target.value = ''; }}
               />
+              <button
+                className="quiet sm"
+                onClick={exportCsv}
+                disabled={!rows.length}
+                title="Download the current view as CSV"
+              >
+                Export CSV
+              </button>
               <button className="primary" onClick={() => fileRef.current?.click()} disabled={upload.isPending}>
                 {upload.isPending ? 'Uploading…' : 'Upload PO PDF'}
               </button>
@@ -191,6 +245,11 @@ export function WorklistPage() {
 
         {list.isLoading ? (
           <div className="empty">Loading…</div>
+        ) : list.isError ? (
+          <div className="err" role="alert">
+            The worklist could not be loaded. It will retry on its own; check the health
+            indicator above if this persists.
+          </div>
         ) : !rows.length ? (
           <div className="empty">
             {q ? `Nothing matches “${q}”.` : 'Nothing here yet. Drop a PO PDF to get started.'}

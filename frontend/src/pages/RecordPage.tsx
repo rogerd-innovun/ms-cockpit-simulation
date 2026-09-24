@@ -33,6 +33,9 @@ export function RecordPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [showReject, setShowReject] = useState(false);
+  // FR-3.4 — publishing a duplicate is allowed with a stated reason; this is that flow.
+  const [overrideReason, setOverrideReason] = useState('');
+  const [showOverride, setShowOverride] = useState(false);
   const [cursor, setCursor] = useState(-1);
   const [showKeys, setShowKeys] = useState(false);
   const [split, setSplit] = useState(42);
@@ -54,9 +57,13 @@ export function RecordPage() {
       qc.setQueryData(['record', id], data);
       qc.invalidateQueries({ queryKey: ['records'] });
       qc.invalidateQueries({ queryKey: ['counts'] });
+      setShowOverride(false);
+      setOverrideReason('');
     },
-    onError: (err) =>
-      setActionError(err instanceof ApiError ? err.message : 'That action could not be completed.'),
+    onError: (err) => {
+      setActionError(err instanceof ApiError ? err.message : 'That action could not be completed.');
+      if (err instanceof ApiError && err.code === 'DUPLICATE_DOCUMENT') setShowOverride(true);
+    },
   });
 
   const d = detail.data;
@@ -218,6 +225,30 @@ export function RecordPage() {
       <LifecycleRail status={r.status} />
 
       {actionError && <div className="err" role="alert">{actionError}</div>}
+
+      {showOverride && r.status === 'DRAFT' && (
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginTop: 14, maxWidth: 560 }}>
+          <div className="fieldrow" style={{ gridTemplateColumns: '1fr', flex: 1 }}>
+            <div className="body">
+              <label htmlFor="override-reason">Why publish it anyway? Goes in the audit trail.</label>
+              <input
+                id="override-reason"
+                autoFocus
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+                placeholder="e.g. the earlier record was a test run"
+              />
+            </div>
+          </div>
+          <button
+            className="primary"
+            disabled={!overrideReason.trim() || busy}
+            onClick={() => mutate.mutate(() => api.publish(id, overrideReason.trim()))}
+          >
+            Publish anyway
+          </button>
+        </div>
+      )}
 
       {showReject && (
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginTop: 14, maxWidth: 560 }}>
@@ -447,7 +478,7 @@ function Notices({ d }: { d: RecordDetail }) {
     r.status === 'EXTRACTION_FAILED' ||
     r.status === 'SENT_TO_SAP' ||
     d.duplicates.length > 0 ||
-    (r.status === 'NEEDS_REVIEW' && r.currentAttempt > 0);
+    (r.status === 'NEEDS_REVIEW' && (r.currentAttempt > 0 || r.failureCode));
   if (!any) return null;
 
   return (
@@ -491,7 +522,24 @@ function Notices({ d }: { d: RecordDetail }) {
           </span>
         </div>
       )}
-      {r.status === 'NEEDS_REVIEW' && r.currentAttempt > 0 && (
+      {/* The failure that sent this record back stays on screen while it is being
+          corrected — the reviewer needs the reason in front of them, not in the
+          history. Covers both a SAP rejection after resubmit and a failed outbound
+          write. Cleared on the next approval. */}
+      {r.status === 'NEEDS_REVIEW' && r.failureCode && d.failure ? (
+        <div className="notice t-warn">
+          <b>Back for correction — {d.failure.code}</b>
+          <span>{d.failure.explanation}</span>
+          <span><b>What to do:</b> {d.failure.remedy}</span>
+          {r.failureMessage && <span className="raw">SAP said: {r.failureMessage}</span>}
+          {r.currentAttempt > 0 && (
+            <span>
+              Approving again submits attempt {r.currentAttempt + 1} under the same correlation id, so
+              an earlier result cannot be mistaken for this one.
+            </span>
+          )}
+        </div>
+      ) : r.status === 'NEEDS_REVIEW' && r.currentAttempt > 0 ? (
         <div className="notice t-info">
           <b>Corrected after a SAP rejection</b>
           <span>
@@ -499,7 +547,7 @@ function Notices({ d }: { d: RecordDetail }) {
             earlier result cannot be mistaken for this one.
           </span>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
