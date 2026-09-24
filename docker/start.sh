@@ -20,6 +20,17 @@ if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
   fi
 fi
 
+# The seed is upsert-based and idempotent: users keep their ids, vendor profiles
+# keep their versions, and re-running it only refreshes names, roles and prompts.
+# Running it on boot means new vendor profiles reach a hosted database without
+# anyone needing the connection string on a laptop.
+if [ "${RUN_SEED:-false}" = "true" ]; then
+  log "running database seed (idempotent upserts)"
+  if ! npx tsx backend/prisma/seed.ts; then
+    log "SEED FAILED — continuing; the app works with whatever is already seeded"
+  fi
+fi
+
 node backend/dist/server.js &
 API_PID=$!
 log "api started (pid $API_PID)"

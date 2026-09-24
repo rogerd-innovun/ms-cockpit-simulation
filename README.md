@@ -49,11 +49,17 @@ Segregation of duties is on by default (`SOD_REQUIRE_SEPARATE_APPROVER=true`), s
 
 ### Need a PO to test with?
 
+Ready-made PDFs live in [`samples/`](samples/) — six industry-realistic layouts
+(UK, German, US, Indian, Swedish, and a fax-style **scan with no text layer** that
+proves extraction works on images, not just born-digital PDFs). Or generate one:
+
 ```bash
 npm -w backend exec tsx scripts/makeSamplePo.ts /tmp/po.pdf --vendor=northwind
+# vendors: northwind | mock | apex | shakti | nordica | scan
 ```
 
-Generates a real text-bearing PO PDF in one of two vendor layouts — readable by Gemini, and it matches a seeded vendor profile.
+Four of the six match a seeded vendor profile; `nordica` and `scan` deliberately
+exercise the generic-prompt fallback.
 
 ---
 

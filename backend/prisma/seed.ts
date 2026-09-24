@@ -39,6 +39,31 @@ const PROFILES = [
       '- Rows labelled "Carriage" or "Handling" are charges, not materials — exclude them from lineItems.',
     ].join('\n'),
   },
+  {
+    name: 'Apex Fastener Supply Inc',
+    identificationHints: { markers: ['Apex Fastener', '31-1745598'] },
+    extractionPrompt: [
+      '- The PO number is labelled "P.O. Number" and starts with "APX-".',
+      '- Dates are written with month names, e.g. "Sep 18, 2026". Return them exactly as printed.',
+      '- Amounts use "," as the thousands separator and "." as the decimal separator.',
+      '- The line table columns are: ITEM | PART NO | DESCRIPTION | QTY | UM | UNIT COST | EXT COST.',
+      '- "PART NO" is our material code. "UM" is the unit of measure (EA, BOX).',
+      '- The "FOB" line is the incoterms value. Notes about FREIGHT or backorders are not line items.',
+    ].join('\n'),
+  },
+  {
+    name: 'Shakti Engineering Works',
+    identificationHints: { markers: ['Shakti Engineering', '27AABCS1429B1ZL'] },
+    extractionPrompt: [
+      '- The PO number is labelled "PO No" and looks like "SEW/2026-27/NNNN" — return it whole, slashes included.',
+      '- Dates are DD-MM-YYYY. Return them exactly as printed; do not convert.',
+      '- Amounts use Indian digit grouping (e.g. 1,23,456.78). Return them exactly as printed.',
+      '- The line table columns are: Sr | Mat. Code | HSN | Description | Qty | UOM | Rate | Amount.',
+      '- "Mat. Code" is our material code. "HSN" is an Indian tax classification code — it is NOT a material or customer material number; do not map it to any field.',
+      '- "Basic Total" is the order total. GST lines and notes about test certificates are not line items.',
+      '- "Party Code" is the customer code.',
+    ].join('\n'),
+  },
 ];
 
 async function main() {

@@ -76,3 +76,7 @@ services:
       # in step with the code without needing the connection string on a laptop.
       - key: RUN_MIGRATIONS
         value: "true"
+      # Idempotent upserts of users and vendor profiles, so new seeded vendor
+      # profiles reach the hosted database on deploy.
+      - key: RUN_SEED
+        value: "true"
