@@ -1,0 +1,54 @@
+.gitattributes
+  s_a053a384cab6fa::t_aed4800f7e4766 3-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "1.6.9",
+  "base_commit_sha": "007df5dacb18b30d3124d7b46d66d5155fb2db2e",
+  "branch": "main",
+  "prompts": {
+    "s_a053a384cab6fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ec44ce7-ac07-431d-b2ff-f29c26b4d9bf",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:eac86c8839d7e986bdb2130ebe7d83ff5822d1ddf00b999a00c224e3252a2ec0",
+      "total_additions": 3,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ecb1cf07284e37": {
+      "author": "Roger D <roger.d@innovunglobal.com>"
+    }
+  },
+  "sessions": {
+    "s_a053a384cab6fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ec44ce7-ac07-431d-b2ff-f29c26b4d9bf",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:eac86c8839d7e986bdb2130ebe7d83ff5822d1ddf00b999a00c224e3252a2ec0",
+      "stats": {
+        "total_additions": 3,
+        "total_deletions": 0,
+        "accepted_lines": 3,
+        "overriden_lines": 0,
+        "files": {
+          ".gitattributes": {
+            "total_additions": 3,
+            "total_deletions": 0,
+            "accepted_lines": 3,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  }
+}
