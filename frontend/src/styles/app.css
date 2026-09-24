@@ -548,6 +548,50 @@ button.restore:hover:not(:disabled) { color: var(--mark); border-bottom-color: v
 .notice .raw { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); }
 .notice-stack { display: flex; flex-direction: column; gap: 2px; margin-top: 16px; }
 
+/* ----------------------------------------------------------------- quality --- */
+/* One line stating how much to trust the read: who read it, the certainty meter
+   with the threshold tick, and the counts. Toned like everything else. */
+
+.quality {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--tone, var(--rule-strong));
+  font-size: 12px;
+  color: var(--ink-2);
+  cursor: help;
+}
+.quality .mono { font-family: var(--font-mono); font-size: 11px; color: var(--ink); }
+.quality-read { white-space: nowrap; }
+.quality-meter {
+  position: relative;
+  flex: 1 1 90px;
+  min-width: 90px;
+  max-width: 180px;
+  height: 6px;
+  background: var(--wash);
+  border: 1px solid var(--rule);
+  overflow: visible;
+}
+.quality-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--tone, var(--rule-strong));
+  opacity: 0.75;
+}
+.quality-bar {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--ink);
+}
+.quality-stats { white-space: nowrap; }
+
 /* ------------------------------------------------------------------ issues --- */
 
 .issues { list-style: none; margin: 0; padding: 0; }

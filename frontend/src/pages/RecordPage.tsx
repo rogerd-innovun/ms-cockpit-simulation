@@ -317,6 +317,8 @@ export function RecordPage() {
                 </span>
               </div>
 
+              {d.extractionQuality && <QualityStrip q={d.extractionQuality} threshold={threshold} />}
+
               {d.validation.issues.length > 0 && (
                 <ul className="issues">
                   {[...blocking, ...warnings].slice(0, 10).map((i) => (
@@ -397,6 +399,55 @@ export function RecordPage() {
 }
 
 // ---------------------------------------------------------------- sub-views
+
+/**
+ * FR-7.2 — how much to trust this read, in one line the reviewer cannot miss.
+ * The meter is the model's own average certainty (not measured accuracy — the
+ * "corrected" count is the measured part: what humans actually changed).
+ */
+function QualityStrip({
+  q,
+  threshold,
+}: {
+  q: NonNullable<RecordDetail['extractionQuality']>;
+  threshold: number;
+}) {
+  const avg = Math.round(q.avgConfidence * 100);
+  const min = Math.round(q.minConfidence * 100);
+  const bar = Math.round(threshold * 100);
+  const tone =
+    q.belowThreshold === 0 && q.avgConfidence >= threshold
+      ? 't-ok'
+      : q.avgConfidence >= threshold
+        ? 't-warn'
+        : 't-crit';
+
+  return (
+    <div
+      className={`quality ${tone}`}
+      title={
+        'Certainty is the model’s own per-field confidence, averaged — not measured accuracy. ' +
+        `Fields below the ${bar}% threshold carry a mark in the margin and must be looked at. ` +
+        'The corrected count is the measured part: fields a person actually changed.'
+      }
+    >
+      <span className="quality-read">
+        Read by <span className="mono">{q.model ?? q.provider ?? 'unknown'}</span>
+        {q.latencyMs != null && <> in {(q.latencyMs / 1000).toFixed(1)}s</>}
+        {(q.attempts ?? 1) > 1 && <> (attempt {q.attempts})</>}
+      </span>
+      <span className="quality-meter" role="img" aria-label={`Average certainty ${avg} percent`}>
+        <span className="quality-fill" style={{ width: `${avg}%` }} />
+        <span className="quality-bar" style={{ left: `${bar}%` }} />
+      </span>
+      <span className="quality-stats cap tnum">
+        {q.fieldsRead}/{q.fieldsTotal} fields · avg {avg}% · min {min}% ·{' '}
+        {q.belowThreshold === 0 ? `none below ${bar}%` : `${q.belowThreshold} below ${bar}%`}
+        {q.corrected > 0 && <> · {q.corrected} corrected</>}
+      </span>
+    </div>
+  );
+}
 
 function Actions({
   d, busy, canApprove, isOwnUpload, onAction, onReject, onDeleted,

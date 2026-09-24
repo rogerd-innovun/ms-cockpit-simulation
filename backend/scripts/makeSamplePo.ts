@@ -13,6 +13,8 @@
  *   shakti     Indian manufacturer    INR  DD-MM-YYYY (lakh grouping, GSTIN, HSN)  matches a seeded profile
  *   nordica    Swedish lab supplies   SEK  YYYY-MM-DD   no profile -> generic prompt
  *   scan       US metals fax (image)  USD  uppercase    no text layer -> vision only
+ *   columns    Australian food dist.  AUD  DD/MM/YYYY   three header blocks side by side
+ *   letter     Irish joinery          EUR  long dates   the whole PO is prose paragraphs
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -36,7 +38,7 @@ const MATERIALS: Omit<Line, 'pos' | 'qty'>[] = [
   { code: 'MAT-3390', customerCode: 'CM-8805', description: 'Safety valve, 16 bar, DN25', uom: 'EA', price: 219.75 },
 ];
 
-const VENDOR_KEYS = ['mock', 'northwind', 'apex', 'shakti', 'nordica', 'scan'] as const;
+const VENDOR_KEYS = ['mock', 'northwind', 'apex', 'shakti', 'nordica', 'scan', 'columns', 'letter'] as const;
 type VendorKey = (typeof VENDOR_KEYS)[number];
 
 function escapePdf(s: string): string {
@@ -324,6 +326,142 @@ function buildNordica(): { rows: Row[]; lines: Line[] } {
   return { rows, lines };
 }
 
+/**
+ * Multi-column layout: ORDER / DELIVER TO / INVOICE TO sit side by side, so the
+ * page's natural text order jumps between unrelated facts — a layout naive
+ * line-by-line readers get badly wrong.
+ */
+function buildColumns(): { rows: Row[]; lines: Line[] } {
+  const { rows, add, drop, at } = makeSheet();
+  const lines = pickLines([0, 2, 3, 4], [4000, 20, 30, 10], 1.5);
+  const money = (n: number) => n.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  add('MERIDIAN FOOD DISTRIBUTORS PTY LTD', { size: 15, bold: true });
+  add('18 Cold Store Road, Laverton North VIC 3026, Australia  ·  ABN 53 004 085 616');
+  drop(12);
+  add('PURCHASE ORDER', { size: 13, bold: true });
+  drop(10);
+
+  // Three blocks across the page, each with its own little y-cursor.
+  const top = at();
+  const block = (x: number, title: string, body: string[]) => {
+    let by = top;
+    rows.push({ text: title, size: 8, bold: true, x, y: by });
+    by -= 13;
+    for (const line of body) {
+      rows.push({ text: line, size: 8, bold: false, x, y: by });
+      by -= 12;
+    }
+    return by;
+  };
+
+  const b1 = block(50, 'ORDER', [
+    'PO No: MFD-72091',
+    'Date: 19/09/2026',
+    'Deliver by: 03/10/2026',
+    'Account: C-6620',
+    'Currency: AUD',
+  ]);
+  const b2 = block(230, 'DELIVER TO', [
+    'Meridian DC 4, Goods In',
+    '18 Cold Store Road',
+    'Laverton North VIC 3026',
+    'Attn: Receiving Supervisor',
+    'Dock hours 05:00-13:00',
+  ]);
+  const b3 = block(410, 'INVOICE TO', [
+    'Meridian Food Distributors',
+    'PO Box 812',
+    'Melbourne VIC 3001',
+    'Terms: 21 days EOM',
+    'Incoterms: DDP Laverton',
+  ]);
+  drop(top - Math.min(b1, b2, b3) + 14);
+
+  const cols = [50, 85, 150, 340, 390, 425, 490];
+  ['Line', 'Product', 'Description', 'Qty', 'Unit', 'Price', 'Value'].forEach((h, i) =>
+    add(h, { bold: true, x: cols[i], y: at(), size: 8 }),
+  );
+  drop(4);
+  add('_'.repeat(95), { size: 8 });
+  drop(4);
+
+  let total = 0;
+  for (const line of lines) {
+    const amount = line.qty * line.price;
+    total += amount;
+    const cells = [String(line.pos), line.code, line.description, String(line.qty), line.uom, money(line.price), money(amount)];
+    cells.forEach((c, i) => add(c, { x: cols[i], y: at() }));
+    drop(14);
+  }
+
+  drop(2);
+  add('_'.repeat(95), { size: 8 });
+  drop(6);
+  add('Order total (GST incl.)', { bold: true, x: 340, y: at() });
+  add(`AUD ${money(total)}`, { bold: true, x: 425, y: at() });
+  drop(24);
+
+  add('Prices include GST at 10%. Pallet deposit AUD 45.00 is refundable and not an order line.', { size: 8 });
+  add('Contact: buying@meridianfoods.example', { size: 8 });
+
+  return { rows, lines };
+}
+
+/**
+ * Letter format: the entire order is prose. Nothing is labelled, dates are written
+ * long-hand, and the line items live inside sentences — the hardest text layout a
+ * real inbox produces.
+ */
+function buildLetter(): { rows: Row[]; lines: Line[] } {
+  const { rows, add, drop } = makeSheet();
+  const lines: Line[] = [
+    { pos: 1, code: 'MAT-5567', customerCode: '', description: 'Hydraulic hose assembly 1/2" 2m', qty: 60, uom: 'EA', price: 92.95 },
+    { pos: 2, code: 'MAT-9021', customerCode: '', description: 'Industrial lubricant, 20L drum', qty: 14, uom: 'BOX', price: 145.2 },
+    { pos: 3, code: 'MAT-3390', customerCode: '', description: 'Safety valve, 16 bar, DN25', qty: 6, uom: 'EA', price: 241.73 },
+  ];
+
+  add('Cascade Timber & Joinery Ltd', { size: 15, bold: true });
+  add('Unit 9, Riverside Business Park, Cork T12 XW70, Ireland');
+  add('VAT IE6388047V  ·  Tel +353 21 555 0164');
+  drop(18);
+
+  add('24 September 2026');
+  drop(10);
+  add('To: Sales Order Desk');
+  drop(14);
+
+  add('PURCHASE ORDER CTJ-2026-118', { size: 12, bold: true });
+  drop(10);
+
+  add('Dear Sir or Madam,');
+  drop(6);
+  add('Please accept this letter as our official purchase order CTJ-2026-118, raised on');
+  add('24 September 2026 against our account number C-8845. We would be grateful for');
+  add('delivery no later than 15 October 2026 to our workshop at Unit 9, Riverside');
+  add('Business Park, Cork, marked for the attention of the joinery foreman.');
+  drop(8);
+  add('As per your quotation Q-4471, we wish to order the following, all prices in');
+  add('euro and excluding VAT:');
+  drop(8);
+  add('  -  60 of hydraulic hose assembly 1/2" 2m (your ref MAT-5567) at EUR 92.95 each;');
+  add('  -  14 of industrial lubricant, 20L drum (your ref MAT-9021), supplied boxed,');
+  add('     at EUR 145.20 per box;');
+  add('  -  6 of safety valve, 16 bar, DN25 (your ref MAT-3390) at EUR 241.73 each.');
+  drop(8);
+  add('The goods total EUR 9,060.18. Invoices fall due 30 days from the invoice date.');
+  add('Delivery is DAP Cork. Please send the invoice to our accounts office at the');
+  add('address above, quoting the order number.');
+  drop(14);
+  add('Yours faithfully,');
+  drop(16);
+  add('Aoife Brennan', { bold: true });
+  add('Purchasing, Cascade Timber & Joinery Ltd');
+  add('purchasing@cascadetimber.example');
+
+  return { rows, lines };
+}
+
 // -------------------------------------------------------------- text-layer PDF
 
 function assemblePdf(objects: (string | Buffer)[]): Buffer {
@@ -585,6 +723,8 @@ if (vendor === 'scan') {
     vendor === 'apex' ? buildApex()
     : vendor === 'shakti' ? buildShakti()
     : vendor === 'nordica' ? buildNordica()
+    : vendor === 'columns' ? buildColumns()
+    : vendor === 'letter' ? buildLetter()
     : buildClassic(vendor);
   pdf = buildTextPdf(built.rows);
   lines = built.lines;

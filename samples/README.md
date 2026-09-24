@@ -15,6 +15,8 @@ npm -w backend exec tsx scripts/makeSamplePo.ts -- samples/po-<vendor>.pdf --ven
 | `po-shakti.pdf` | Shakti Engineering Works Pvt. Ltd. | Indian manufacturer (GSTIN, HSN column that must NOT be read as a material number, lakh grouping `1,23,456.78`) | INR, `18-09-2026` | ✅ seeded |
 | `po-nordica.pdf` | Nordica Lab Supplies AB | Swedish lab supplier (bilingual Inköpsorder) | SEK, `2026-09-18`, `1 234,56` | ❌ — exercises the generic-prompt fallback |
 | `po-scan.pdf` | Orion Metals & Alloys LLC | **Fax/scan: a pure image with no text layer.** Extracting it requires reading pixels, which is what proves the vision path works on scans | USD, uppercase | ❌ — scans can't marker-match, generic prompt |
+| `po-columns.pdf` | Meridian Food Distributors Pty Ltd | **Multi-column layout** — ORDER / DELIVER TO / INVOICE TO side by side, so naive line-order reading interleaves unrelated facts | AUD, `19/09/2026` | ❌ — generic prompt |
+| `po-letter.pdf` | Cascade Timber & Joinery Ltd | **Letter format — the whole PO is prose.** Nothing is labelled; dates are long-hand; the line items live inside sentences | EUR, `24 September 2026` | ❌ — generic prompt |
 
 Each layout deliberately contains traps a naive extractor falls into: charge rows
 ("Carriage", "FREIGHT", "GST @18%") that are not line items, totals rows inside the

@@ -131,8 +131,23 @@ export interface MappedFailure {
   fieldHint?: string;
 }
 
+/** FR-7.2 — the read, summarised. Confidence is the model's own certainty; `corrected` is what humans actually changed. */
+export interface ExtractionQuality {
+  fieldsTotal: number;
+  fieldsRead: number;
+  avgConfidence: number;
+  minConfidence: number;
+  belowThreshold: number;
+  corrected: number;
+  provider: string | null;
+  model: string | null;
+  latencyMs: number | null;
+  attempts: number | null;
+}
+
 export interface RecordDetail {
   record: PORecord;
+  extractionQuality: ExtractionQuality | null;
   fields: FieldProvenance[];
   validation: {
     threshold: number;

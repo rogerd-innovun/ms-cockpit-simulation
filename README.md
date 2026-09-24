@@ -49,17 +49,18 @@ Segregation of duties is on by default (`SOD_REQUIRE_SEPARATE_APPROVER=true`), s
 
 ### Need a PO to test with?
 
-Ready-made PDFs live in [`samples/`](samples/) — six industry-realistic layouts
-(UK, German, US, Indian, Swedish, and a fax-style **scan with no text layer** that
-proves extraction works on images, not just born-digital PDFs). Or generate one:
+Ready-made PDFs live in [`samples/`](samples/) — eight industry-realistic layouts
+(UK, German, US, Indian, Swedish; a fax-style **scan with no text layer** that
+proves extraction works on images; a **multi-column** page; and a **prose letter**
+where the order lives inside sentences). Or generate one:
 
 ```bash
 npm -w backend exec tsx scripts/makeSamplePo.ts /tmp/po.pdf --vendor=northwind
-# vendors: northwind | mock | apex | shakti | nordica | scan
+# vendors: northwind | mock | apex | shakti | nordica | scan | columns | letter
 ```
 
-Four of the six match a seeded vendor profile; `nordica` and `scan` deliberately
-exercise the generic-prompt fallback.
+Four of the eight match a seeded vendor profile; the rest deliberately exercise
+the generic-prompt fallback.
 
 ---
 

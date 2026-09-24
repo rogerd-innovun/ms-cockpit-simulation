@@ -586,7 +586,7 @@ export async function getRecordOrThrow(recordId: string) {
 export async function getRecordDetail(recordId: string) {
   const record = await getRecordOrThrow(recordId);
 
-  const [fields, submissions, results, audit, acks] = await Promise.all([
+  const [fields, submissions, results, audit, acks, lastRun] = await Promise.all([
     prisma.fieldExtraction.findMany({
       where: { recordId },
       include: { editedBy: { select: { id: true, name: true } } },
@@ -603,12 +603,43 @@ export async function getRecordDetail(recordId: string) {
       include: { actor: { select: { id: true, name: true } } },
     }),
     prisma.validationAck.findMany({ where: { recordId } }),
+    prisma.extractionRun.findFirst({
+      where: { recordId, outcome: 'SUCCESS' },
+      orderBy: { attempt: 'desc' },
+      select: { provider: true, model: true, latencyMs: true, attempt: true },
+    }),
   ]);
 
   const issues = await validateRecord(record.header);
   const acknowledged = new Set(acks.map((a) => `${a.code}::${a.fieldPath}`));
 
+  /**
+   * FR-7.2 / NFR-5.2 — the read, summarised so a reviewer can see at a glance how
+   * much to trust it. Confidence is the model's own certainty, not measured
+   * accuracy; `corrected` is the measured part — what humans actually changed.
+   * Null when nothing was extracted (drafts, manual entry before any run).
+   */
+  const confidences = fields
+    .map((f) => f.confidence)
+    .filter((c): c is number => c != null);
+  const extractionQuality =
+    confidences.length === 0
+      ? null
+      : {
+          fieldsTotal: fields.length,
+          fieldsRead: fields.filter((f) => f.extractedValue != null).length,
+          avgConfidence: confidences.reduce((a, b) => a + b, 0) / confidences.length,
+          minConfidence: Math.min(...confidences),
+          belowThreshold: confidences.filter((c) => c < env.CONFIDENCE_THRESHOLD).length,
+          corrected: fields.filter((f) => f.editedAt != null).length,
+          provider: lastRun?.provider ?? null,
+          model: lastRun?.model ?? null,
+          latencyMs: lastRun?.latencyMs ?? null,
+          attempts: lastRun?.attempt ?? null,
+        };
+
   return {
+    extractionQuality,
     record,
     fields: fields.map((f) => ({
       fieldPath: f.fieldPath,
