@@ -1,2 +1,5 @@
 # Shell scripts must keep LF endings; CRLF breaks them inside Linux containers.
 *.sh text eol=lf
+
+# PDFs are binary; line-ending normalisation corrupts their streams.
+*.pdf binary
