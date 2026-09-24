@@ -47,6 +47,10 @@ describe('status machine (docs/01-requirements.md §5)', () => {
     }
   });
 
+  it('NFR-2.4: a crash mid-extraction can be requeued (PROCESSING → PUBLISHED)', () => {
+    expect(canTransition('PROCESSING', 'PUBLISHED')).toBe(true);
+  });
+
   it('a failed order can be corrected but never auto-retried into SAP', () => {
     expect(TRANSITIONS.FAILED).toEqual(['NEEDS_REVIEW']);
     expect(TRANSITIONS.FAILED).not.toContain('SENT_TO_SAP');

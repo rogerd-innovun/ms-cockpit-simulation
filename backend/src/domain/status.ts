@@ -10,7 +10,9 @@ import { conflict } from '../lib/errors.js';
 export const TRANSITIONS: Record<POStatus, readonly POStatus[]> = {
   DRAFT: ['PUBLISHED', 'CANCELLED'],
   PUBLISHED: ['PROCESSING'],
-  PROCESSING: ['NEEDS_REVIEW', 'EXTRACTION_FAILED'],
+  // PROCESSING → PUBLISHED is crash recovery (NFR-2.4): only a process death mid-
+  // extraction leaves a record in PROCESSING, and requeueing it is the resume.
+  PROCESSING: ['NEEDS_REVIEW', 'EXTRACTION_FAILED', 'PUBLISHED'],
   NEEDS_REVIEW: ['APPROVED', 'CANCELLED'],
   EXTRACTION_FAILED: ['PROCESSING', 'NEEDS_REVIEW', 'CANCELLED'],
   APPROVED: ['SENT_TO_SAP', 'NEEDS_REVIEW'],

@@ -1,6 +1,7 @@
 import { env } from '../config/env.js';
 import { prisma } from '../db/client.js';
 import { childLogger } from '../lib/logger.js';
+import { writeAudit } from '../services/audit.js';
 import { runExtractionForRecord } from '../services/extraction/index.js';
 import { scanResultFolder, sweepSlaTimeouts } from '../services/sap/resultWatcher.js';
 import { submitToSap } from '../services/sap/outbound.js';
@@ -35,6 +36,37 @@ function loop(name: string, intervalMs: number, fn: () => Promise<void>) {
 
 /** FR-3.1 / FR-3.2 — pick up PUBLISHED records and extract them. */
 async function extractionTick() {
+  // NFR-2.4 — PROCESSING was the one status nothing recovered: it means this
+  // process died mid-extraction (a deploy, a free-tier sleep, a crash). Once a
+  // record has sat there longer than a full extraction with all its retries could
+  // take, requeue it, so a restart resumes the work instead of stranding it.
+  const stuckSince = new Date(
+    Date.now() - env.EXTRACTION_TIMEOUT_MS * env.EXTRACTION_MAX_ATTEMPTS - 60_000,
+  );
+  const stuck = await prisma.pORecord.findMany({
+    where: { status: 'PROCESSING', deletedAt: null, statusChangedAt: { lt: stuckSince } },
+    select: { id: true },
+  });
+  for (const record of stuck) {
+    await prisma.pORecord.update({
+      where: { id: record.id },
+      data: { status: 'PUBLISHED', statusChangedAt: new Date() },
+    });
+    await writeAudit({
+      recordId: record.id,
+      eventType: 'EXTRACTION_REQUEUED',
+      message: 'Found stuck in PROCESSING after a restart; requeued for extraction.',
+      actorName: 'extraction-worker',
+    });
+    await writeAudit({
+      recordId: record.id,
+      eventType: 'STATUS_CHANGED',
+      message: 'PROCESSING → PUBLISHED (crash recovery)',
+      actorName: 'extraction-worker',
+    });
+    log.warn({ recordId: record.id }, 'requeued a record stuck in PROCESSING');
+  }
+
   const next = await prisma.pORecord.findFirst({
     where: { status: 'PUBLISHED', deletedAt: null },
     orderBy: { statusChangedAt: 'asc' },

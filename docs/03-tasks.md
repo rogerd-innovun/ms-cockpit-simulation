@@ -3,8 +3,8 @@
 | Field | Value |
 |---|---|
 | Document ID | SPEC-003 |
-| Status | Milestone 1 complete |
-| Last updated | 2026-09-21 |
+| Status | Milestone 1 complete + production hardening |
+| Last updated | 2026-09-24 |
 | Phase | Tasks (Requirements → Design → **Tasks**) |
 
 ---
@@ -48,6 +48,26 @@ Every status in the lifecycle is reachable, end to end, with a human approval ch
 
 ---
 
+## 1.1 Production hardening — 2026-09-24
+
+Defects found and fixed after the hosted deployment went live, each verified
+against the running Render instance:
+
+| # | Fix | Requirements |
+|---|---|---|
+| H-1 | CSP allowed `frame-src blob:` — the review screen's PDF preview was blanked in production (helmet's default has no frame-src) | FR-7.1 |
+| H-2 | PDF bytes stored in Postgres (`SourceDocument.content`); disk is a cache. Uploads survive the free host's disk wipes on deploy/wake | FR-1.9 |
+| H-3 | Missing source PDF during extraction lands in Extraction Failed with a message, instead of stranding the record in Processing | FR-4.12 |
+| H-4 | Oversized uploads get a 413 naming the limit instead of a bare 500 | NFR-4.3 |
+| H-5 | Expired session (12h JWT) signs out to the login page instead of masquerading as missing data | NFR-3.1 |
+| H-6 | Duplicate publish offers the override-reason flow in the UI (the API always supported it) | FR-3.4 |
+| H-7 | A record sent back for correction keeps its failure explanation on screen | FR-11.3 |
+| H-8 | Worklist CSV export of the current view | FR-12.6 |
+| H-9 | Migrations apply on container boot (`RUN_MIGRATIONS=true`); `/api/health` reports the live git commit and boot time | NFR-5.1 |
+| H-10 | A record stuck in PROCESSING after a crash mid-extraction is requeued (the one status the database-as-queue design did not recover) | NFR-2.4 |
+
+---
+
 ## 2. Milestone 2 — the deferred requirements
 
 | # | Task | Requirements | Blocked by |
@@ -60,7 +80,7 @@ Every status in the lifecycle is reachable, end to end, with a human approval ch
 | 2.6 | Multi-instance worker safety (`FOR UPDATE SKIP LOCKED`) | NFR-2.4 | L-1 |
 | 2.7 | Per-field source highlighting in the PDF | FR-7.4 | extractor bounding boxes |
 | 2.8 | Continuous autosave during review | FR-7.7 | L-8 |
-| 2.9 | Worklist CSV export | FR-12.6 | — |
+| 2.9 | ~~Worklist CSV export~~ done — see H-8 | FR-12.6 | ✅ |
 | 2.10 | Metrics: correction rate per field, SAP rejection rate by code | NFR-5.2 | — |
 | 2.11 | Retention and soft-delete purge jobs | NFR-7 | `OQ-10` |
 | 2.12 | Integration tests over the worker loops | — | — |
