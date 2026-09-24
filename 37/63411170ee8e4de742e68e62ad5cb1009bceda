@@ -1,0 +1,90 @@
+docs/03-tasks.md
+  s_a053a384cab6fa::t_adaf15694d20c3 6-7
+  s_a053a384cab6fa::t_8c7c1a1ed721c7 67
+  s_a053a384cab6fa::t_4bdc5f3edeef6d 83
+  s_a053a384cab6fa::t_8386e7c4186330 51-66,68-70
+backend/src/domain/status.ts
+  s_a053a384cab6fa::t_af23160555f321 13-15
+backend/src/workers/index.ts
+  s_a053a384cab6fa::t_f235cc041991ac 39-69
+  s_a053a384cab6fa::t_299eb327740db7 4
+backend/src/services/audit.ts
+  s_a053a384cab6fa::t_a8acde3b70fc6b 19
+backend/src/domain/status.test.ts
+  s_a053a384cab6fa::t_2f8eaaa2ef16e6 50-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "1.6.9",
+  "base_commit_sha": "3763411170ee8e4de742e68e62ad5cb1009bceda",
+  "branch": "main",
+  "prompts": {
+    "s_a053a384cab6fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ec44ce7-ac07-431d-b2ff-f29c26b4d9bf",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:9c3590bc7ab2c9673a11534f59f735293f82353432c320cf9ca2eab6f3209eb2",
+      "total_additions": 63,
+      "total_deletions": 4,
+      "accepted_lines": 63,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ecb1cf07284e37": {
+      "author": "Roger D <roger.d@innovunglobal.com>"
+    }
+  },
+  "sessions": {
+    "s_a053a384cab6fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ec44ce7-ac07-431d-b2ff-f29c26b4d9bf",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:9c3590bc7ab2c9673a11534f59f735293f82353432c320cf9ca2eab6f3209eb2",
+      "stats": {
+        "total_additions": 63,
+        "total_deletions": 4,
+        "accepted_lines": 63,
+        "overriden_lines": 0,
+        "files": {
+          "backend/src/domain/status.test.ts": {
+            "total_additions": 4,
+            "total_deletions": 0,
+            "accepted_lines": 4,
+            "overriden_lines": 0
+          },
+          "backend/src/domain/status.ts": {
+            "total_additions": 3,
+            "total_deletions": 1,
+            "accepted_lines": 3,
+            "overriden_lines": 0
+          },
+          "backend/src/services/audit.ts": {
+            "total_additions": 1,
+            "total_deletions": 0,
+            "accepted_lines": 1,
+            "overriden_lines": 0
+          },
+          "backend/src/workers/index.ts": {
+            "total_additions": 32,
+            "total_deletions": 0,
+            "accepted_lines": 32,
+            "overriden_lines": 0
+          },
+          "docs/03-tasks.md": {
+            "total_additions": 23,
+            "total_deletions": 3,
+            "accepted_lines": 23,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  }
+}
