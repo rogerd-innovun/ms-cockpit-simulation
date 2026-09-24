@@ -125,7 +125,7 @@ Cancels the existing records, uploads two sample POs, publishes them and waits f
 
 It passes a duplicate-override reason deliberately: once a copy of a sample PDF has reached SAP, `FR-3.4` refuses to publish an identical file without a stated reason — which is every re-bake after the first successful run.
 
-**Why you need it:** Render's free plan has no persistent disk, so every deploy *and* every wake from its 15-minute idle sleep empties `storage/`. Records and the audit trail survive in Postgres; the PDFs do not, so the review screen's document pane breaks for older records.
+**Why you might need it:** to reset the demo walk-through to a known state. PDFs are stored in Postgres alongside the records (the container disk is only a cache), so deploys and wake-from-sleep no longer break the document pane — except for records uploaded before that change, whose bytes are gone for good and want a re-bake once.
 
 If `%TEMP%` has been cleared, regenerate the PDFs the script expects:
 
@@ -135,7 +135,7 @@ npm -w backend exec tsx scripts/makeSamplePo.ts -- "$d\po1.pdf" --vendor=northwi
 npm -w backend exec tsx scripts/makeSamplePo.ts -- "$d\po2.pdf" --vendor=mock
 ```
 
-> **Pushing to `main` redeploys.** `render.yaml` sets `autoDeployTrigger: commit`, so any push wipes the PDFs and needs a re-bake afterwards. Turn Auto-Deploy off in the Render dashboard before a demo.
+> **Pushing to `main` redeploys.** `render.yaml` sets `autoDeployTrigger: commit`. A deploy no longer loses PDFs (they live in Postgres), but it does restart the service — turn Auto-Deploy off in the Render dashboard before a live demo so a stray push can't cold-start it mid-walkthrough.
 
 ---
 

@@ -89,9 +89,10 @@ npm -w backend exec prisma db execute --stdin
 
 ## Step 4 — migrate and seed, from your laptop
 
-Migrations run from here, not on container boot — one less thing to fail during a
-deploy. Shell variables take precedence over `backend/.env`, so your local setup is
-untouched.
+The first migration and the seed run from here. After that, `RUN_MIGRATIONS=true` in
+`render.yaml` applies any *later* migrations on container boot (a boot with nothing
+pending is a fast no-op, and `start.sh` refuses to start if a migration fails). Shell
+variables take precedence over `backend/.env`, so your local setup is untouched.
 
 ```powershell
 $env:DATABASE_URL = "<the session pooler string from step 3>"
@@ -179,9 +180,13 @@ flagging is the most interesting thing in the product.
 
 **The disk is ephemeral.** Render's free plan has no persistent volume, so on every
 deploy and every wake-from-sleep the container starts with empty `storage/` and
-`integration/`. Records and the audit trail survive in Supabase, but the **PDFs do
-not** — the review screen's document pane will fail for records uploaded before a
-restart. This is why step 7 says pre-bake *close* to the demo.
+`integration/`. Records, the audit trail **and the PDFs** survive in Supabase — the
+PDF bytes are stored on the record (`SourceDocument.content`) and the disk copy is
+only a cache, so the document pane keeps working across restarts. What a restart
+*does* lose is anything in flight in `integration/`: an order CSV the simulator had
+not consumed yet is gone, and that record falls to **Failed** via the SLA sweep —
+resubmit it. (Records uploaded before the durable-storage change have no database
+copy; their PDFs are permanently gone and the UI says so.)
 
 **Supabase pauses after ~7 days idle.** Open the dashboard once a week, or the first
 request after a long gap fails while it wakes.

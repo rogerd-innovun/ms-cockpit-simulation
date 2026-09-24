@@ -10,6 +10,8 @@ import { checkOutboundWritable } from './services/sap/outbound.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+const BOOT_TIME = new Date().toISOString();
+
 export function createApp() {
   const app = express();
 
@@ -54,6 +56,12 @@ export function createApp() {
         completenessConvention: env.COMPLETENESS_CONVENTION,
         confidenceThreshold: env.CONFIDENCE_THRESHOLD,
         sodRequireSeparateApprover: env.SOD_REQUIRE_SEPARATE_APPROVER,
+      },
+      // Which build is live and when it last (re)started — on a host that sleeps
+      // and redeploys on every push, "is this the new container?" is a real question.
+      build: {
+        startedAt: BOOT_TIME,
+        gitCommit: process.env.RENDER_GIT_COMMIT ?? null,
       },
     });
   });
