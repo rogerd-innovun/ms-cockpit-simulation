@@ -1,0 +1,94 @@
+render.yaml
+  s_a053a384cab6fa::t_58ac51357dc85c 79-82
+README.md
+  s_a053a384cab6fa::t_da5298f3287e60 52-55,58,61-62
+backend/prisma/seed.ts
+  s_a053a384cab6fa::t_23c1cd5d9824a4 42-66
+docker/start.sh
+  s_a053a384cab6fa::t_d1fe8aa8709c6e 23-33
+samples/README.md
+  s_a053a384cab6fa::t_e48f4243618e68 1-22
+backend/scripts/makeSamplePo.ts
+  s_a053a384cab6fa::t_9cad1d782b529f 2-5,7-15,19,39-41,48,50-70,93,96,105,111,117-118,120,128-130,133,135-138,141,147-350,352,355,362-502,504-509,511-518,520-526,528-565,568-569,571-576,579-591
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "1.6.9",
+  "base_commit_sha": "41a995c5c7e6c79be1ae53df8dd0bc7d335fcab8",
+  "branch": "main",
+  "prompts": {
+    "s_a053a384cab6fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ec44ce7-ac07-431d-b2ff-f29c26b4d9bf",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:43a969810ea75f3ef10722240492db67aab65cfbab0f0c7a8e1bcda88cf3bcf6",
+      "total_additions": 552,
+      "total_deletions": 63,
+      "accepted_lines": 552,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ecb1cf07284e37": {
+      "author": "Roger D <roger.d@innovunglobal.com>"
+    }
+  },
+  "sessions": {
+    "s_a053a384cab6fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ec44ce7-ac07-431d-b2ff-f29c26b4d9bf",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:43a969810ea75f3ef10722240492db67aab65cfbab0f0c7a8e1bcda88cf3bcf6",
+      "stats": {
+        "total_additions": 552,
+        "total_deletions": 63,
+        "accepted_lines": 552,
+        "overriden_lines": 0,
+        "files": {
+          "README.md": {
+            "total_additions": 7,
+            "total_deletions": 1,
+            "accepted_lines": 7,
+            "overriden_lines": 0
+          },
+          "backend/prisma/seed.ts": {
+            "total_additions": 25,
+            "total_deletions": 0,
+            "accepted_lines": 25,
+            "overriden_lines": 0
+          },
+          "backend/scripts/makeSamplePo.ts": {
+            "total_additions": 483,
+            "total_deletions": 62,
+            "accepted_lines": 483,
+            "overriden_lines": 0
+          },
+          "docker/start.sh": {
+            "total_additions": 11,
+            "total_deletions": 0,
+            "accepted_lines": 11,
+            "overriden_lines": 0
+          },
+          "render.yaml": {
+            "total_additions": 4,
+            "total_deletions": 0,
+            "accepted_lines": 4,
+            "overriden_lines": 0
+          },
+          "samples/README.md": {
+            "total_additions": 22,
+            "total_deletions": 0,
+            "accepted_lines": 22,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  }
+}
