@@ -1,0 +1,107 @@
+samples/README.md
+  s_a053a384cab6fa::t_06dd41d6e08799 18-19
+backend/src/services/records.ts
+  s_a053a384cab6fa::t_2794cce7b1cfd0 616-640,642
+  s_a053a384cab6fa::t_5fb80a9b7cf785 589,606-610
+frontend/src/styles/app.css
+  s_a053a384cab6fa::t_dce77f0f20d272 551-594
+README.md
+  s_a053a384cab6fa::t_0014db1137e5f6 52-55,59,62-63
+backend/scripts/makeSamplePo.ts
+  s_a053a384cab6fa::t_e86b91c32226e5 329-464
+  s_a053a384cab6fa::t_c395b1b6d61888 16-17
+  s_a053a384cab6fa::t_0cb8f8bac4216b 726-727
+  s_a053a384cab6fa::t_6785fcb1ca39b2 41
+frontend/src/pages/RecordPage.tsx
+  s_a053a384cab6fa::t_5dfc65a8226518 403-451
+  s_a053a384cab6fa::t_c45786eb45cd60 320-321
+frontend/src/lib/types.ts
+  s_a053a384cab6fa::t_246eeb270e9d33 134-147,150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "1.6.9",
+  "base_commit_sha": "e325f45a14162766d13a0e93d48e505141c0c00e",
+  "branch": "main",
+  "prompts": {
+    "s_a053a384cab6fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ec44ce7-ac07-431d-b2ff-f29c26b4d9bf",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:49cd9911929c05a17bd577fe560aaef7575a37c454f52ac14fd199cf288137a4",
+      "total_additions": 292,
+      "total_deletions": 8,
+      "accepted_lines": 292,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ecb1cf07284e37": {
+      "author": "Roger D <roger.d@innovunglobal.com>"
+    }
+  },
+  "sessions": {
+    "s_a053a384cab6fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ec44ce7-ac07-431d-b2ff-f29c26b4d9bf",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:49cd9911929c05a17bd577fe560aaef7575a37c454f52ac14fd199cf288137a4",
+      "stats": {
+        "total_additions": 292,
+        "total_deletions": 8,
+        "accepted_lines": 292,
+        "overriden_lines": 0,
+        "files": {
+          "README.md": {
+            "total_additions": 7,
+            "total_deletions": 6,
+            "accepted_lines": 7,
+            "overriden_lines": 0
+          },
+          "backend/scripts/makeSamplePo.ts": {
+            "total_additions": 141,
+            "total_deletions": 1,
+            "accepted_lines": 141,
+            "overriden_lines": 0
+          },
+          "backend/src/services/records.ts": {
+            "total_additions": 32,
+            "total_deletions": 1,
+            "accepted_lines": 32,
+            "overriden_lines": 0
+          },
+          "frontend/src/lib/types.ts": {
+            "total_additions": 15,
+            "total_deletions": 0,
+            "accepted_lines": 15,
+            "overriden_lines": 0
+          },
+          "frontend/src/pages/RecordPage.tsx": {
+            "total_additions": 51,
+            "total_deletions": 0,
+            "accepted_lines": 51,
+            "overriden_lines": 0
+          },
+          "frontend/src/styles/app.css": {
+            "total_additions": 44,
+            "total_deletions": 0,
+            "accepted_lines": 44,
+            "overriden_lines": 0
+          },
+          "samples/README.md": {
+            "total_additions": 2,
+            "total_deletions": 0,
+            "accepted_lines": 2,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  }
+}
