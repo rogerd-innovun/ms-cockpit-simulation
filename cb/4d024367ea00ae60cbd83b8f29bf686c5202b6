@@ -1,0 +1,150 @@
+backend/prisma/migrations/20260924070000_source_document_content/migration.sql
+  s_a053a384cab6fa::t_ea941f38d39704 1-4
+backend/prisma/schema.prisma
+  s_a053a384cab6fa::t_8113797919cfe1 128-133
+render.yaml
+  s_a053a384cab6fa::t_dcab7949a85829 74-76,78
+backend/src/db/client.ts
+  s_a053a384cab6fa::t_9ffc42fd2aa692 3-8
+backend/src/modules/records/routes.ts
+  s_a053a384cab6fa::t_4c6fe62abe81ff 12
+  s_a053a384cab6fa::t_15a2bcc961b2c5 94-99
+backend/src/services/extraction/index.ts
+  s_a053a384cab6fa::t_950fe8c04d5598 16
+  s_a053a384cab6fa::t_a7941ea32137ec 100-125
+frontend/src/components/PdfPane.tsx
+  s_a053a384cab6fa::t_06da2c57c9c3df 31-37
+backend/src/app.ts
+  s_a053a384cab6fa::t_4f3f74e267d9c7 16-30
+backend/src/services/storage.ts
+  s_a053a384cab6fa::t_bb30f6e62293a0 45-74
+  s_a053a384cab6fa::t_9c76d1fc567c70 4
+backend/src/services/records.ts
+  s_a053a384cab6fa::t_bb709798e58356 80-82
+  s_a053a384cab6fa::t_4e8cc7d3bde246 78-79
+frontend/src/lib/api.ts
+  s_a053a384cab6fa::t_4569e3853333f5 139-148
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "1.6.9",
+  "base_commit_sha": "cb4d024367ea00ae60cbd83b8f29bf686c5202b6",
+  "branch": "main",
+  "prompts": {
+    "s_a053a384cab6fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ec44ce7-ac07-431d-b2ff-f29c26b4d9bf",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:2e435bde755902282d00f2ab851d143eeb47c81bb07cb574a35614993f7f8ff2",
+      "total_additions": 136,
+      "total_deletions": 21,
+      "accepted_lines": 135,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ecb1cf07284e37": {
+      "author": "Roger D <roger.d@innovunglobal.com>"
+    }
+  },
+  "sessions": {
+    "s_a053a384cab6fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ec44ce7-ac07-431d-b2ff-f29c26b4d9bf",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:2e435bde755902282d00f2ab851d143eeb47c81bb07cb574a35614993f7f8ff2",
+      "stats": {
+        "total_additions": 136,
+        "total_deletions": 21,
+        "accepted_lines": 135,
+        "overriden_lines": 0,
+        "files": {
+          "DEPLOY.md": {
+            "total_additions": 11,
+            "total_deletions": 6,
+            "accepted_lines": 11,
+            "overriden_lines": 0
+          },
+          "README.md": {
+            "total_additions": 2,
+            "total_deletions": 2,
+            "accepted_lines": 2,
+            "overriden_lines": 0
+          },
+          "backend/prisma/migrations/20260924070000_source_document_content/migration.sql": {
+            "total_additions": 4,
+            "total_deletions": 0,
+            "accepted_lines": 4,
+            "overriden_lines": 0
+          },
+          "backend/prisma/schema.prisma": {
+            "total_additions": 6,
+            "total_deletions": 0,
+            "accepted_lines": 6,
+            "overriden_lines": 0
+          },
+          "backend/src/app.ts": {
+            "total_additions": 15,
+            "total_deletions": 1,
+            "accepted_lines": 15,
+            "overriden_lines": 0
+          },
+          "backend/src/db/client.ts": {
+            "total_additions": 6,
+            "total_deletions": 1,
+            "accepted_lines": 6,
+            "overriden_lines": 0
+          },
+          "backend/src/modules/records/routes.ts": {
+            "total_additions": 7,
+            "total_deletions": 2,
+            "accepted_lines": 7,
+            "overriden_lines": 0
+          },
+          "backend/src/services/extraction/index.ts": {
+            "total_additions": 27,
+            "total_deletions": 2,
+            "accepted_lines": 27,
+            "overriden_lines": 0
+          },
+          "backend/src/services/records.ts": {
+            "total_additions": 6,
+            "total_deletions": 1,
+            "accepted_lines": 5,
+            "overriden_lines": 0
+          },
+          "backend/src/services/storage.ts": {
+            "total_additions": 31,
+            "total_deletions": 2,
+            "accepted_lines": 31,
+            "overriden_lines": 0
+          },
+          "frontend/src/components/PdfPane.tsx": {
+            "total_additions": 7,
+            "total_deletions": 1,
+            "accepted_lines": 7,
+            "overriden_lines": 0
+          },
+          "frontend/src/lib/api.ts": {
+            "total_additions": 10,
+            "total_deletions": 1,
+            "accepted_lines": 10,
+            "overriden_lines": 0
+          },
+          "render.yaml": {
+            "total_additions": 4,
+            "total_deletions": 2,
+            "accepted_lines": 4,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  }
+}
