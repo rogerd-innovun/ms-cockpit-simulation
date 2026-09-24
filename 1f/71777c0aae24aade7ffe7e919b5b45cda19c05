@@ -1,0 +1,96 @@
+backend/src/middleware/error.ts
+  s_a053a384cab6fa::t_2199a19dab7642 2,4
+  s_a053a384cab6fa::t_c5da52cfe47e33 20-32
+frontend/src/pages/WorklistPage.tsx
+  s_a053a384cab6fa::t_3c4234f12795ce 54-58,60-62
+  s_a053a384cab6fa::t_5df95204069486 199-206
+  s_a053a384cab6fa::t_fedd0e0de0e008 129-131,138-171
+  s_a053a384cab6fa::t_312281a9b16f0c 42-43
+  s_a053a384cab6fa::t_76c60a651188a2 248-252
+frontend/src/lib/api.ts
+  s_a053a384cab6fa::t_e023ce9bef35a5 151
+  s_a053a384cab6fa::t_bfe8f39571c074 33-43,53
+.github/workflows/keepalive.yml
+  s_a053a384cab6fa::t_799d3592de09a5 4-8
+frontend/src/pages/RecordPage.tsx
+  s_a053a384cab6fa::t_b94f08fc971282 525-542,550
+  s_a053a384cab6fa::t_f9b69cca7885b1 36-38
+  s_a053a384cab6fa::t_8c0fda04dd6945 229-252
+  s_a053a384cab6fa::t_0eb8c0b4a9da10 481
+  s_a053a384cab6fa::t_01c567b5fa8d2a 60-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "1.6.9",
+  "base_commit_sha": "1f71777c0aae24aade7ffe7e919b5b45cda19c05",
+  "branch": "main",
+  "prompts": {
+    "s_a053a384cab6fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ec44ce7-ac07-431d-b2ff-f29c26b4d9bf",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:bf1a0332c5f64188de7a49ca29b78a73f31a2a73c967bb62c37df349b3e74bb9",
+      "total_additions": 148,
+      "total_deletions": 15,
+      "accepted_lines": 148,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ecb1cf07284e37": {
+      "author": "Roger D <roger.d@innovunglobal.com>"
+    }
+  },
+  "sessions": {
+    "s_a053a384cab6fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ec44ce7-ac07-431d-b2ff-f29c26b4d9bf",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:bf1a0332c5f64188de7a49ca29b78a73f31a2a73c967bb62c37df349b3e74bb9",
+      "stats": {
+        "total_additions": 148,
+        "total_deletions": 15,
+        "accepted_lines": 148,
+        "overriden_lines": 0,
+        "files": {
+          ".github/workflows/keepalive.yml": {
+            "total_additions": 5,
+            "total_deletions": 7,
+            "accepted_lines": 5,
+            "overriden_lines": 0
+          },
+          "backend/src/middleware/error.ts": {
+            "total_additions": 15,
+            "total_deletions": 0,
+            "accepted_lines": 15,
+            "overriden_lines": 0
+          },
+          "frontend/src/lib/api.ts": {
+            "total_additions": 13,
+            "total_deletions": 0,
+            "accepted_lines": 13,
+            "overriden_lines": 0
+          },
+          "frontend/src/pages/RecordPage.tsx": {
+            "total_additions": 53,
+            "total_deletions": 5,
+            "accepted_lines": 53,
+            "overriden_lines": 0
+          },
+          "frontend/src/pages/WorklistPage.tsx": {
+            "total_additions": 62,
+            "total_deletions": 3,
+            "accepted_lines": 62,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  }
+}
