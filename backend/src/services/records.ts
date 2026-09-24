@@ -75,6 +75,11 @@ export async function createRecord(
             mimeType: 'application/pdf',
             byteSize: stored.byteSize,
             contentHash: stored.contentHash,
+            // The durable copy — the file at storagePath is only a cache on hosts
+            // with ephemeral disks (FR-1.9: the PDF stays viewable at every stage).
+            // Copied into a plain Uint8Array because Prisma's Bytes type does not
+            // accept a Node Buffer's ArrayBufferLike backing.
+            content: new Uint8Array(file.buffer),
             pageCount: stored.pageCount,
           },
         },

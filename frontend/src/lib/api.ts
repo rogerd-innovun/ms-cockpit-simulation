@@ -136,7 +136,16 @@ export const api = {
     const res = await fetch(`/api/records/${id}/document`, {
       headers: { Authorization: `Bearer ${getToken() ?? ''}` },
     });
-    if (!res.ok) throw new ApiError(res.status, 'Could not load the PDF.', 'PDF_ERROR');
+    if (!res.ok) {
+      let message = 'Could not load the PDF.';
+      try {
+        const body = (await res.json()) as { error?: { message?: string } };
+        if (body?.error?.message) message = body.error.message;
+      } catch {
+        /* non-JSON error body — keep the generic message */
+      }
+      throw new ApiError(res.status, message, 'PDF_ERROR');
+    }
     return URL.createObjectURL(await res.blob());
   },
 };

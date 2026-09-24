@@ -13,7 +13,21 @@ import path from 'node:path';
 export function createApp() {
   const app = express();
 
-  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      contentSecurityPolicy: {
+        directives: {
+          ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+          // The review screen shows the PDF through an iframe whose src is a blob:
+          // object URL (PdfPane). The default CSP has no frame-src, so frames fall
+          // back to default-src 'self' — and 'self' never matches blob:, which
+          // blanks the preview in production while "Open in new tab" still works.
+          'frame-src': ["'self'", 'blob:'],
+        },
+      },
+    }),
+  );
   app.use(cors({ origin: env.CORS_ORIGIN.split(',').map((o) => o.trim()) }));
   app.use(express.json({ limit: '2mb' }));
 

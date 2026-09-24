@@ -28,7 +28,13 @@ export function PdfPane({ recordId, filename }: { recordId: string; filename: st
         revoked = objectUrl;
         setUrl(objectUrl);
       })
-      .catch(() => setError('The source PDF could not be loaded. Try reloading the page.'));
+      .catch((err: unknown) =>
+        setError(
+          err instanceof Error && err.message
+            ? err.message
+            : 'The source PDF could not be loaded. Try reloading the page.',
+        ),
+      );
 
     return () => {
       cancelled = true;

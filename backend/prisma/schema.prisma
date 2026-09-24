@@ -125,6 +125,12 @@ model SourceDocument {
   byteSize         Int
   /// FR-1.4 — SHA-256, used for duplicate detection (FR-3.4) and integrity.
   contentHash      String
+  /// FR-1.9 — the PDF bytes themselves. The database is the durable copy; the file at
+  /// storagePath is only a warm cache, because free-tier hosts wipe the disk on every
+  /// deploy and wake-from-sleep. Globally omitted from queries (see db/client.ts) —
+  /// select it explicitly where the bytes are actually needed. Null only on records
+  /// uploaded before this column existed.
+  content          Bytes?
   pageCount        Int?
   uploadedAt       DateTime @default(now())
 

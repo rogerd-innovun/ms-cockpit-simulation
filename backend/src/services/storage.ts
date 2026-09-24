@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { env } from '../config/env.js';
+import { prisma } from '../db/client.js';
 import { sha256 } from '../lib/ids.js';
 
 /**
@@ -41,8 +42,36 @@ export async function storeDocument(recordId: string, buffer: Buffer): Promise<S
   };
 }
 
-export async function readDocument(storagePath: string): Promise<Buffer> {
-  return fs.readFile(storagePath);
+/**
+ * Read a record's PDF. The disk copy is only a warm cache — free-tier hosts wipe it
+ * on every deploy and wake-from-sleep — so on a miss the bytes come back from the
+ * database (SourceDocument.content) and the cache is re-warmed. Returns null when
+ * neither copy exists, which can only happen for records uploaded before the content
+ * column existed whose disk copy is gone; that loss is permanent, and the caller
+ * turns it into a clear error rather than an ENOENT.
+ */
+export async function loadDocumentContent(
+  recordId: string,
+  storagePath: string,
+): Promise<Buffer | null> {
+  try {
+    return await fs.readFile(storagePath);
+  } catch {
+    /* cache miss — fall through to the database copy */
+  }
+
+  const doc = await prisma.sourceDocument.findUnique({
+    where: { recordId },
+    select: { content: true },
+  });
+  if (!doc?.content) return null;
+
+  const buffer = Buffer.from(doc.content);
+  // Re-warm the disk cache; a failure here costs nothing but the next read's speed.
+  fs.mkdir(path.dirname(storagePath), { recursive: true })
+    .then(() => fs.writeFile(storagePath, buffer))
+    .catch(() => {});
+  return buffer;
 }
 
 export async function deleteDocument(recordId: string): Promise<void> {

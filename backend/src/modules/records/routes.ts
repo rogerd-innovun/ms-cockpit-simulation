@@ -9,7 +9,7 @@ import { STATUS_LABELS, TRANSITIONS } from '../../domain/status.js';
 import { badRequest, notFound } from '../../lib/errors.js';
 import { requireAuth } from '../../middleware/auth.js';
 import * as records from '../../services/records.js';
-import { readDocument } from '../../services/storage.js';
+import { loadDocumentContent } from '../../services/storage.js';
 
 export const recordsRouter = Router();
 recordsRouter.use(requireAuth);
@@ -91,7 +91,12 @@ recordsRouter.get('/:id/document', async (req, res, next) => {
       include: { sourceDocument: true },
     });
     if (!record?.sourceDocument) throw notFound('No document on this record.');
-    const buffer = await readDocument(record.sourceDocument.storagePath);
+    const buffer = await loadDocumentContent(record.id, record.sourceDocument.storagePath);
+    if (!buffer) {
+      throw notFound(
+        'The PDF for this record is no longer available. It was uploaded before documents were stored durably, and the host has since cleared its disk.',
+      );
+    }
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',

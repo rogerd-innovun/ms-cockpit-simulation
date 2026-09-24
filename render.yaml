@@ -71,6 +71,8 @@ services:
       - key: SAP_SIM_FAILURE_RATE
         value: "0.15"        # set 0 for a demo where nothing should fail
 
-      # Migrations are run from your laptop in step 4, not on boot.
+      # Apply pending migrations on boot (start.sh refuses to start if this fails).
+      # A boot with nothing pending is a fast no-op; this keeps the Supabase schema
+      # in step with the code without needing the connection string on a laptop.
       - key: RUN_MIGRATIONS
-        value: "false"
+        value: "true"

@@ -13,7 +13,7 @@ import {
   type LineField,
 } from '../../domain/types.js';
 import { writeAudit } from '../audit.js';
-import { readDocument } from '../storage.js';
+import { loadDocumentContent } from '../storage.js';
 import { GeminiExtractionProvider } from './gemini.js';
 import { MockExtractionProvider } from './mock.js';
 import { GENERIC_EXTRACTION_PROMPT, GENERIC_PROMPT_VERSION, buildVendorPrompt } from './prompts.js';
@@ -97,7 +97,32 @@ export async function runExtractionForRecord(recordId: string): Promise<void> {
     actorName: 'extraction-worker',
   });
 
-  const pdf = await readDocument(record.sourceDocument.storagePath);
+  const pdf = await loadDocumentContent(recordId, record.sourceDocument.storagePath);
+  if (!pdf) {
+    // Neither the disk cache nor the database copy exists — an unretryable loss, so
+    // land in EXTRACTION_FAILED rather than throwing and stranding the record in
+    // PROCESSING, a status no worker ever picks back up.
+    const message =
+      'The uploaded PDF is no longer available (the host disk was cleared and no database copy exists). Upload it again.';
+    await prisma.pORecord.update({
+      where: { id: recordId },
+      data: { status: 'EXTRACTION_FAILED', statusChangedAt: new Date() },
+    });
+    await writeAudit({
+      recordId,
+      eventType: 'EXTRACTION_FAILED',
+      message,
+      actorName: 'extraction-worker',
+    });
+    await writeAudit({
+      recordId,
+      eventType: 'STATUS_CHANGED',
+      message: 'PROCESSING → EXTRACTION_FAILED',
+      actorName: 'extraction-worker',
+    });
+    log.error({ recordId }, 'source document missing from disk and database');
+    return;
+  }
   const profile = await matchVendorProfile(pdf, record.vendorHint);
   const prompt = profile
     ? buildVendorPrompt(profile.name, profile.extractionPrompt)
