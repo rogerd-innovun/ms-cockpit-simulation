@@ -5,10 +5,10 @@ const prisma = new PrismaClient();
 
 /**
  * Seed users cover the segregation-of-duties case (FR-7.11): with
- * SOD_REQUIRE_SEPARATE_APPROVER=true, clerk@ uploads and approver@ approves.
+ * SOD_REQUIRE_SEPARATE_APPROVER=true, uploader@ uploads and approver@ approves.
  */
 const USERS = [
-  { email: 'clerk@cockpit.local', name: 'Clerk (Uploader)', role: 'UPLOADER' as const },
+  { email: 'uploader@cockpit.local', name: 'Uploader', role: 'UPLOADER' as const },
   { email: 'approver@cockpit.local', name: 'Approver', role: 'APPROVER' as const },
   { email: 'ops@cockpit.local', name: 'Operations', role: 'OPERATIONS' as const },
   { email: 'admin@cockpit.local', name: 'Administrator', role: 'ADMIN' as const },
@@ -66,8 +66,26 @@ const PROFILES = [
   },
 ];
 
+/**
+ * Accounts that used to be seeded under another address. Renamed in place rather than
+ * re-created, so the user keeps its id and every upload and audit event stays attached to
+ * it. Only when the new address is free: if both exist, neither is touched.
+ */
+const RENAMED_USERS = [{ from: 'clerk@cockpit.local', to: 'uploader@cockpit.local' }];
+
 async function main() {
   const passwordHash = await bcrypt.hash('cockpit123', 10);
+
+  for (const { from, to } of RENAMED_USERS) {
+    const [old, taken] = await Promise.all([
+      prisma.user.findUnique({ where: { email: from } }),
+      prisma.user.findUnique({ where: { email: to } }),
+    ]);
+    if (old && !taken) {
+      await prisma.user.update({ where: { id: old.id }, data: { email: to } });
+      console.log(`Renamed ${from} to ${to}.`);
+    }
+  }
 
   for (const user of USERS) {
     await prisma.user.upsert({

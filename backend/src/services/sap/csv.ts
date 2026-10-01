@@ -1,5 +1,44 @@
 import { env } from '../../config/env.js';
-import type { HeaderWithLines } from '../../domain/validation.js';
+import {
+  formatDate,
+  normaliseDecimal,
+  parseDate,
+  type DateFormat,
+  type HeaderWithLines,
+} from '../../domain/validation.js';
+
+export interface CsvFormat {
+  dateFormat: DateFormat;
+  decimalSeparator: '.' | ',';
+}
+
+const envFormat = (): CsvFormat => ({
+  dateFormat: env.CSV_DATE_FORMAT,
+  decimalSeparator: env.CSV_DECIMAL_SEPARATOR,
+});
+
+/**
+ * FR-5.8 / FR-9.4 — the PO's own writing ("SEP 17, 2026", "1.234,56", "18/09/2026") is
+ * kept for the reviewer, but SAP is sent one fixed form. A value that cannot be read
+ * throws rather than going out as it was typed: approval already refused such values,
+ * so reaching here means something bypassed it, and a loud failure (the record returns
+ * to review with the reason) beats a date SAP reads some other way.
+ */
+export class OutboundFormatError extends Error {}
+
+function asDate(raw: string | null | undefined, what: string, fmt: CsvFormat): string {
+  if (raw == null || raw.trim() === '') return '';
+  const d = parseDate(raw);
+  if (!d) throw new OutboundFormatError(`${what} "${raw}" is not a valid date, so it cannot be written to the SAP file.`);
+  return formatDate(d, fmt.dateFormat);
+}
+
+function asDecimal(raw: string | null | undefined, what: string, fmt: CsvFormat): string {
+  if (raw == null || raw.trim() === '') return '';
+  const n = normaliseDecimal(raw);
+  if (n === null) throw new OutboundFormatError(`${what} "${raw}" is not a number, so it cannot be written to the SAP file.`);
+  return fmt.decimalSeparator === ',' ? n.replace('.', ',') : n;
+}
 
 /**
  * FR-9.2 / docs/01-requirements.md §8.2.
@@ -75,6 +114,7 @@ export function buildOutboundPayload(
   correlationId: string,
   attempt: number,
   header: HeaderWithLines,
+  fmt: CsvFormat = envFormat(),
 ): OutboundPayload {
   const attemptStr = String(attempt);
   const lines = [...header.lineItems].sort((a, b) => a.lineNumber - b.lineNumber);
@@ -86,16 +126,16 @@ export function buildOutboundPayload(
     correlationId,
     attemptStr,
     header.poNumber,
-    header.poDate,
+    asDate(header.poDate, 'PO date', fmt),
     header.customerCode,
     header.customerName,
     header.shipTo,
     header.billTo,
-    header.currency,
-    header.requestedDeliveryDate,
+    header.currency?.trim().toUpperCase(),
+    asDate(header.requestedDeliveryDate, 'Requested delivery date', fmt),
     header.paymentTerms,
     header.incoterms,
-    header.poTotalValue,
+    asDecimal(header.poTotalValue, 'PO total value', fmt),
   ];
 
   const lineRows = lines.map((l) =>
@@ -107,11 +147,11 @@ export function buildOutboundPayload(
       l.materialCode,
       l.customerMaterialNumber,
       l.description,
-      l.quantity,
+      asDecimal(l.quantity, `Line ${l.lineNumber} quantity`, fmt),
       l.uom,
-      l.unitPrice,
-      l.lineNetValue,
-      l.deliveryDate,
+      asDecimal(l.unitPrice, `Line ${l.lineNumber} unit price`, fmt),
+      asDecimal(l.lineNetValue, `Line ${l.lineNumber} net value`, fmt),
+      asDate(l.deliveryDate, `Line ${l.lineNumber} delivery date`, fmt),
       l.plant,
     ]),
   );

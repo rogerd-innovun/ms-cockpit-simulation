@@ -127,7 +127,11 @@ export async function runExtractionForRecord(recordId: string): Promise<void> {
   const prompt = profile
     ? buildVendorPrompt(profile.name, profile.extractionPrompt)
     : GENERIC_EXTRACTION_PROMPT;
-  const promptVersion = profile ? `${profile.name}-v${profile.version}` : GENERIC_PROMPT_VERSION;
+  // A vendor prompt is the generic rules plus that vendor's notes (buildVendorPrompt), so
+  // it changes when either does; the stored version names both (FR-4.4).
+  const promptVersion = profile
+    ? `${profile.name}-v${profile.version}+${GENERIC_PROMPT_VERSION}`
+    : GENERIC_PROMPT_VERSION;
 
   const attempt = (await prisma.extractionRun.count({ where: { recordId } })) + 1;
   const run = await prisma.extractionRun.create({

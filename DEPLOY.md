@@ -171,7 +171,7 @@ flagging is the most interesting thing in the product.
       start takes ~40–60s. Don't let the audience watch that.
 - [ ] `curl /api/health` → `ok:true`
 - [ ] Both pre-baked records still in **Needs review**
-- [ ] Signed in as `approver@cockpit.local` (the clerk **cannot** approve — that's the
+- [ ] Signed in as `approver@cockpit.local` (the uploader **cannot** approve — that's the
       control you want to demonstrate, so know which account you're on)
 - [ ] `SAP_SIM_FAILURE_RATE=0` if you don't want a random 15% rejection mid-demo.
       Set it back to `0.15` afterwards — the failure path is worth showing deliberately.

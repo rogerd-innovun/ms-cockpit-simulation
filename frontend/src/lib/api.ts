@@ -1,4 +1,4 @@
-import type { AuthUser, RecordDetail, WorklistRow } from './types';
+import type { AuthUser, RecordDetail, SapLogCall, SapLogState, WorklistRow } from './types';
 
 const TOKEN_KEY = 'cockpit.token';
 
@@ -75,11 +75,13 @@ export const api = {
 
   health: () => request<{ ok: boolean; checks: Record<string, { ok: boolean; error?: string }> }>('/health'),
 
-  list: (params: { status?: string; q?: string; mine?: boolean }) => {
+  list: (params: { status?: string; q?: string; mine?: boolean; take?: number; skip?: number }) => {
     const qs = new URLSearchParams();
     if (params.status) qs.set('status', params.status);
     if (params.q) qs.set('q', params.q);
     if (params.mine) qs.set('mine', 'true');
+    if (params.take != null) qs.set('take', String(params.take));
+    if (params.skip != null) qs.set('skip', String(params.skip));
     return request<{ rows: WorklistRow[]; total: number }>(`/records?${qs}`);
   },
 
@@ -120,6 +122,13 @@ export const api = {
       body: JSON.stringify({ code, fieldPath }),
     }),
 
+  /** Accept every warning currently raised on the record. */
+  acknowledgeAll: (id: string) =>
+    request<RecordDetail>(`/records/${id}/acknowledge`, {
+      method: 'POST',
+      body: JSON.stringify({ all: true }),
+    }),
+
   approve: (id: string) => request<RecordDetail>(`/records/${id}/approve`, { method: 'POST' }),
 
   reject: (id: string, reason: string) =>
@@ -142,6 +151,11 @@ export const api = {
     }),
 
   deleteDraft: (id: string) => request<void>(`/records/${id}`, { method: 'DELETE' }),
+
+  sapLog: (id: string) => request<SapLogState>(`/records/${id}/sap-log`),
+
+  callSapLog: (id: string) =>
+    request<{ call: SapLogCall }>(`/records/${id}/sap-log`, { method: 'POST' }),
 
   /** The PDF is behind auth, so it is fetched as a blob rather than linked directly. */
   documentUrl: async (id: string) => {

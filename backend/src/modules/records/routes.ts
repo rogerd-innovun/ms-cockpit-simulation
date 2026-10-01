@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
-import type { POStatus } from '@prisma/client';
 import { env } from '../../config/env.js';
 import { prisma } from '../../db/client.js';
 import { HEADER_FIELDS, LINE_FIELDS } from '../../domain/types.js';
@@ -9,6 +8,7 @@ import { STATUS_LABELS, TRANSITIONS } from '../../domain/status.js';
 import { badRequest, notFound } from '../../lib/errors.js';
 import { requireAuth } from '../../middleware/auth.js';
 import * as records from '../../services/records.js';
+import { lineParamsSchema, listQuerySchema } from './query.js';
 import { loadDocumentContent } from '../../services/storage.js';
 
 export const recordsRouter = Router();
@@ -25,17 +25,38 @@ const actorOf = (req: Parameters<Parameters<Router['get']>[1]>[0]) => ({
   name: req.user!.name,
 });
 
+/**
+ * The one shape every record-detail response carries. The review screen types
+ * all of them as a single RecordDetail and reads `duplicates` unconditionally,
+ * so a route that answered with the bare service payload took the whole page
+ * down with it. Built here once rather than spread across a dozen handlers.
+ */
+async function detailResponse(id: string) {
+  const detail = await records.getRecordDetail(id);
+  const contentHash = detail.record.sourceDocument?.contentHash;
+  return {
+    ...detail,
+    duplicates: await records.findPoNumberDuplicates(id),
+    // Same bytes as another live record (FR-3.4). Upload already reported this, but the
+    // UI navigates away from that response; carrying it on the record is what lets the
+    // draft screen warn before anyone clicks Publish.
+    documentDuplicates: contentHash ? await records.findDuplicates(contentHash, id) : [],
+    allowedTransitions: TRANSITIONS[detail.record.status],
+    statusLabel: STATUS_LABELS[detail.record.status],
+  };
+}
+
 // ---- FR-12 worklist -------------------------------------------------------
 
 recordsRouter.get('/', async (req, res, next) => {
   try {
-    const statusParam = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const query = listQuerySchema.parse(req.query);
     const result = await records.listRecords({
-      status: statusParam ? (statusParam.split(',') as POStatus[]) : undefined,
-      q: typeof req.query.q === 'string' ? req.query.q : undefined,
-      uploadedById: req.query.mine === 'true' ? req.user!.id : undefined,
-      take: req.query.take ? Number(req.query.take) : undefined,
-      skip: req.query.skip ? Number(req.query.skip) : undefined,
+      status: query.status,
+      q: query.q,
+      uploadedById: query.mine === 'true' ? req.user!.id : undefined,
+      take: query.take,
+      skip: query.skip,
     });
     res.json(result);
   } catch (err) {
@@ -70,14 +91,7 @@ recordsRouter.post('/', upload.single('file'), async (req, res, next) => {
 
 recordsRouter.get('/:id', async (req, res, next) => {
   try {
-    const detail = await records.getRecordDetail(req.params.id!);
-    const duplicates = await records.findPoNumberDuplicates(req.params.id!);
-    res.json({
-      ...detail,
-      duplicates,
-      allowedTransitions: TRANSITIONS[detail.record.status],
-      statusLabel: STATUS_LABELS[detail.record.status],
-    });
+    res.json(await detailResponse(req.params.id!));
   } catch (err) {
     next(err);
   }
@@ -115,15 +129,8 @@ recordsRouter.patch('/:id', async (req, res, next) => {
     const body = z
       .object({ vendorHint: z.string().nullable().optional(), notes: z.string().nullable().optional() })
       .parse(req.body);
-    const record = await records.getRecordOrThrow(req.params.id!);
-    if (record.status !== 'DRAFT') {
-      throw badRequest('Metadata can only be changed while the record is in Draft.', 'NOT_EDITABLE');
-    }
-    await prisma.pORecord.update({
-      where: { id: record.id },
-      data: { vendorHint: body.vendorHint ?? null, notes: body.notes ?? null },
-    });
-    res.json(await records.getRecordDetail(record.id));
+    await records.updateRecordMetadata(actorOf(req), req.params.id!, body);
+    res.json(await detailResponse(req.params.id!));
   } catch (err) {
     next(err);
   }
@@ -133,7 +140,7 @@ recordsRouter.post('/:id/publish', async (req, res, next) => {
   try {
     const reason = typeof req.body?.overrideReason === 'string' ? req.body.overrideReason : undefined;
     await records.publishRecord(actorOf(req), req.params.id!, reason);
-    res.json(await records.getRecordDetail(req.params.id!));
+    res.json(await detailResponse(req.params.id!));
   } catch (err) {
     next(err);
   }
@@ -150,13 +157,12 @@ recordsRouter.delete('/:id', async (req, res, next) => {
 
 recordsRouter.post('/:id/cancel', async (req, res, next) => {
   try {
-    res.json(
-      await records.cancelRecord(
-        actorOf(req),
-        req.params.id!,
-        typeof req.body?.reason === 'string' ? req.body.reason : undefined,
-      ),
+    await records.cancelRecord(
+      actorOf(req),
+      req.params.id!,
+      typeof req.body?.reason === 'string' ? req.body.reason : undefined,
     );
+    res.json(await detailResponse(req.params.id!));
   } catch (err) {
     next(err);
   }
@@ -179,7 +185,8 @@ const fieldUpdateSchema = z.object({
 recordsRouter.patch('/:id/fields', async (req, res, next) => {
   try {
     const updates = fieldUpdateSchema.parse(req.body);
-    res.json(await records.updateFields(actorOf(req), req.params.id!, updates));
+    await records.updateFields(actorOf(req), req.params.id!, updates);
+    res.json(await detailResponse(req.params.id!));
   } catch (err) {
     next(err);
   }
@@ -187,7 +194,8 @@ recordsRouter.patch('/:id/fields', async (req, res, next) => {
 
 recordsRouter.post('/:id/lines', async (req, res, next) => {
   try {
-    res.json(await records.addLine(actorOf(req), req.params.id!));
+    await records.addLine(actorOf(req), req.params.id!);
+    res.json(await detailResponse(req.params.id!));
   } catch (err) {
     next(err);
   }
@@ -195,7 +203,9 @@ recordsRouter.post('/:id/lines', async (req, res, next) => {
 
 recordsRouter.delete('/:id/lines/:lineNumber', async (req, res, next) => {
   try {
-    res.json(await records.deleteLine(actorOf(req), req.params.id!, Number(req.params.lineNumber)));
+    const { lineNumber } = lineParamsSchema.parse(req.params);
+    await records.deleteLine(actorOf(req), req.params.id!, lineNumber);
+    res.json(await detailResponse(req.params.id!));
   } catch (err) {
     next(err);
   }
@@ -203,10 +213,15 @@ recordsRouter.delete('/:id/lines/:lineNumber', async (req, res, next) => {
 
 recordsRouter.post('/:id/acknowledge', async (req, res, next) => {
   try {
-    const { code, fieldPath } = z
-      .object({ code: z.string().min(1), fieldPath: z.string().min(1) })
+    // One warning ({ code, fieldPath }), or every warning currently raised ({ all: true }).
+    const body = z
+      .union([
+        z.object({ all: z.literal(true) }),
+        z.object({ code: z.string().min(1), fieldPath: z.string().min(1) }),
+      ])
       .parse(req.body);
-    res.json(await records.acknowledgeWarning(actorOf(req), req.params.id!, code, fieldPath));
+    await records.acknowledgeWarnings(actorOf(req), req.params.id!, 'all' in body ? 'all' : body);
+    res.json(await detailResponse(req.params.id!));
   } catch (err) {
     next(err);
   }
@@ -216,7 +231,8 @@ recordsRouter.post('/:id/acknowledge', async (req, res, next) => {
 
 recordsRouter.post('/:id/approve', async (req, res, next) => {
   try {
-    res.json(await records.approveRecord(actorOf(req), req.params.id!));
+    await records.approveRecord(actorOf(req), req.params.id!);
+    res.json(await detailResponse(req.params.id!));
   } catch (err) {
     next(err);
   }
@@ -225,7 +241,8 @@ recordsRouter.post('/:id/approve', async (req, res, next) => {
 recordsRouter.post('/:id/reject', async (req, res, next) => {
   try {
     const { reason } = z.object({ reason: z.string().min(1) }).parse(req.body);
-    res.json(await records.rejectRecord(actorOf(req), req.params.id!, reason));
+    await records.rejectRecord(actorOf(req), req.params.id!, reason);
+    res.json(await detailResponse(req.params.id!));
   } catch (err) {
     next(err);
   }
@@ -233,7 +250,8 @@ recordsRouter.post('/:id/reject', async (req, res, next) => {
 
 recordsRouter.post('/:id/resubmit', async (req, res, next) => {
   try {
-    res.json(await records.resubmitRecord(actorOf(req), req.params.id!));
+    await records.resubmitRecord(actorOf(req), req.params.id!);
+    res.json(await detailResponse(req.params.id!));
   } catch (err) {
     next(err);
   }
@@ -241,7 +259,8 @@ recordsRouter.post('/:id/resubmit', async (req, res, next) => {
 
 recordsRouter.post('/:id/retry-extraction', async (req, res, next) => {
   try {
-    res.json(await records.retryExtraction(actorOf(req), req.params.id!));
+    await records.retryExtraction(actorOf(req), req.params.id!);
+    res.json(await detailResponse(req.params.id!));
   } catch (err) {
     next(err);
   }
@@ -249,7 +268,8 @@ recordsRouter.post('/:id/retry-extraction', async (req, res, next) => {
 
 recordsRouter.post('/:id/manual-entry', async (req, res, next) => {
   try {
-    res.json(await records.switchToManualEntry(actorOf(req), req.params.id!));
+    await records.switchToManualEntry(actorOf(req), req.params.id!);
+    res.json(await detailResponse(req.params.id!));
   } catch (err) {
     next(err);
   }

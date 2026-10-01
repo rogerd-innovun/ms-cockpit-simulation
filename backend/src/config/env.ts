@@ -54,8 +54,34 @@ const schema = z.object({
   CSV_DELIMITER: z.string().default(','),
   /** IC-07 — does the existing SAP job expect a column-name row? (OQ-03) */
   CSV_HEADER_ROW: bool(false),
+  /**
+   * FR-9.4 — how dates and decimals are written to SAP, whatever form the PO used.
+   * iso 2026-09-17 · yyyymmdd 20260917 (SAP DATS) · dd.mm.yyyy 17.09.2026.
+   * Both are provisional until OQ-03 is closed, like the rest of the layout.
+   */
+  CSV_DATE_FORMAT: z.enum(['iso', 'yyyymmdd', 'dd.mm.yyyy']).default('iso'),
+  CSV_DECIMAL_SEPARATOR: z.enum(['.', ',']).default('.'),
   SAP_RESULT_POLL_MS: int(3000),
   SAP_SLA_TIMEOUT_MS: int(60 * 60 * 1000),
+
+  /**
+   * ZEE_API_LOG — the SAP team's API that takes Sales Order numbers in table
+   * IT_SALEORDERS (field VBELN, CHAR10). A direct call, alongside the folder drop.
+   * off: not offered · mock: answered in-process, nothing leaves the cockpit ·
+   * live: POSTed to SAP_LOG_API_URL. Endpoint, transport and auth are still to be
+   * confirmed by the SAP team, so all of them are configuration.
+   */
+  SAP_LOG_API_MODE: z.enum(['off', 'mock', 'live']).default('off'),
+  SAP_LOG_API_URL: z.string().optional().default(''),
+  /** json: {"IT_SALEORDERS":[{"VBELN":…}]} · soap: the function module's generated web service. */
+  SAP_LOG_API_FORMAT: z.enum(['json', 'soap']).default('json'),
+  SAP_LOG_API_USER: z.string().optional().default(''),
+  SAP_LOG_API_PASSWORD: z.string().optional().default(''),
+  /** Appended as ?sap-client=… when set. */
+  SAP_CLIENT: z.string().optional().default(''),
+  /** Gateway/ICF services that enforce CSRF reject a POST without a fetched token. */
+  SAP_LOG_API_CSRF: bool(false),
+  SAP_LOG_API_TIMEOUT_MS: int(30_000),
 
   // Workers
   WORKERS_ENABLED: bool(true),

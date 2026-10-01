@@ -22,8 +22,19 @@ function assertExtractionConfigured() {
   }
 }
 
+function assertSapLogApiConfigured() {
+  if (env.SAP_LOG_API_MODE === 'live' && !env.SAP_LOG_API_URL) {
+    throw new Error(
+      'SAP_LOG_API_MODE is "live" but SAP_LOG_API_URL is empty.\n' +
+        '  Set SAP_LOG_API_URL to the ZEE_API_LOG endpoint, or\n' +
+        '  set SAP_LOG_API_MODE=mock (answered in-process) or off.',
+    );
+  }
+}
+
 async function main() {
   assertExtractionConfigured();
+  assertSapLogApiConfigured();
   await ensureDirectories();
 
   const app = createApp();

@@ -3,7 +3,7 @@ import { useAuth } from '../lib/auth';
 import { ApiError } from '../lib/api';
 
 const ACCOUNTS = [
-  { email: 'clerk@cockpit.local', cando: 'uploads — cannot approve' },
+  { email: 'uploader@cockpit.local', cando: 'uploads — cannot approve' },
   { email: 'approver@cockpit.local', cando: 'approves for SAP' },
   { email: 'ops@cockpit.local', cando: 'monitors failures' },
   { email: 'admin@cockpit.local', cando: 'administrator' },
@@ -20,7 +20,7 @@ const STEPS = [
 
 export function LoginPage() {
   const { login } = useAuth();
-  const [email, setEmail] = useState('clerk@cockpit.local');
+  const [email, setEmail] = useState('uploader@cockpit.local');
   const [password, setPassword] = useState('cockpit123');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -108,7 +108,7 @@ export function LoginPage() {
 
           <div className="accounts">
             <p className="cap" style={{ marginBottom: 6 }}>
-              Seeded accounts — password <span className="mono">cockpit123</span>. The clerk cannot
+              Seeded accounts — password <span className="mono">cockpit123</span>. The uploader cannot
               approve their own uploads.
             </p>
             {ACCOUNTS.map((a) => (
