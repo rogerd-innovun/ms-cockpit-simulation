@@ -1,0 +1,732 @@
+backend/src/services/audit.ts
+  s_5f5f3ef2604517::t_8d51786bb655fe 32
+  s_1ec0bd235949da::t_2e4558d5cdc41b 35
+  s_5f5f3ef2604517::t_1c4301aecaf431 13
+README.md
+  s_5f5f3ef2604517::t_06dbe38d164d8d 43
+  s_5f5f3ef2604517::t_00129d14bfb943 48
+  s_5f5f3ef2604517::t_ab8dc3543bdf4e 52-57,60,62,65-68
+  s_5f5f3ef2604517::t_bdb17d5c5baed3 163
+  s_5f5f3ef2604517::t_7c2359116a7db0 121
+docs/02-design.md
+  s_1ec0bd235949da::t_f0dc3357aa873a 212
+  s_5f5f3ef2604517::t_3a593242958cbe 214,216
+  s_5f5f3ef2604517::t_b95bc903b97c28 222
+  s_5f5f3ef2604517::t_011842c35b9042 152-161
+  s_5f5f3ef2604517::t_e13f1fce78427a 101-102
+  s_5f5f3ef2604517::t_6960bd6ca7c9a0 207
+  s_5f5f3ef2604517::t_d42b886d6a6100 174-175
+  s_1ec0bd235949da::t_bf925de5e61036 127-136
+  s_5f5f3ef2604517::t_a004b121f04ba9 231-232,234
+  s_1ec0bd235949da::t_71e3286ba3f5e5 229-230
+  s_5f5f3ef2604517::t_2c8e44de7c20a2 233
+  s_5f5f3ef2604517::t_1e77b65b68d6e7 137-151
+backend/src/services/records.approve.test.ts
+  s_5f5f3ef2604517::t_7b3880fecb30c2 1,3-5,8-19,21-24,29-38,40,43-55,60-88,155-156
+  s_5f5f3ef2604517::t_328e8173768c1e 2,6-7,20,25-28,39,41-42,56-59,89-154
+samples/README.md
+  s_60839e153da942::t_da17900ab7526f 1,3-10,15,57-84
+  s_5f5f3ef2604517::t_a081ad318eb7a7 11
+  s_5f5f3ef2604517::t_e4a7bf897f33d6 28-32,38-40,43-48,51
+  s_5f5f3ef2604517::t_992b4fc5f29f0d 41-42,49-50,52-56
+frontend/src/pages/LoginPage.tsx
+  s_5f5f3ef2604517::t_db3e18af4a7950 23,111
+backend/src/domain/sentBack.ts
+  s_5f5f3ef2604517::t_d98034a9abfe70 1-39
+backend/prisma/seed.ts
+  s_5f5f3ef2604517::t_394c0818310097 8,11
+  s_5f5f3ef2604517::t_1ca52f507fda09 69-75,79-88
+backend/src/domain/sentBack.test.ts
+  s_5f5f3ef2604517::t_e2ac111fc10d2a 1-54
+backend/src/services/sap/outbound.test.ts
+  s_5f5f3ef2604517::t_8b465b2e88e94c 23-24,27
+  s_5f5f3ef2604517::t_4e36377a5f3f18 1-22,25-26,28-33,35,37-102
+  s_5f5f3ef2604517::t_523b4890b861f1 34,36
+backend/src/services/records.metadata.test.ts
+  s_5f5f3ef2604517::t_61f1d754315b99 1-140
+backend/src/domain/acknowledgement.ts
+  s_5f5f3ef2604517::t_22b2f5dcdad449 1-54
+frontend/src/lib/types.ts
+  s_5f5f3ef2604517::t_047f44d2c73273 190-199
+  s_1ec0bd235949da::t_1a41018922e0ba 127-154
+backend/src/domain/acknowledgement.test.ts
+  s_5f5f3ef2604517::t_12e7c2b2383b7a 1-9,12-15,17-57,59-60
+  s_5f5f3ef2604517::t_ab9ec312d2beb5 10-11,16
+  s_5f5f3ef2604517::t_ce524c8180e222 58
+backend/src/services/sap/logApi.test.ts
+  s_1ec0bd235949da::t_69712a7d492829 104,108-112
+  s_1ec0bd235949da::t_8381a106baca65 1-103,105-107,113-142
+.env.example
+  s_5f5f3ef2604517::t_5e66c5194ae104 35-39
+  s_1ec0bd235949da::t_a2f6fb425c598d 51-66
+backend/src/services/sap/vbeln.test.ts
+  s_1ec0bd235949da::t_242959303c5b14 1-27
+backend/src/services/records.acknowledge.test.ts
+  s_5f5f3ef2604517::t_bae9e6b1fccca7 1-115
+backend/src/services/extraction/prompts.test.ts
+  s_5f5f3ef2604517::t_f7f1f534bdd0b0 12
+  s_5f5f3ef2604517::t_f205f411b4b260 1-11,13-29
+backend/src/services/sap/csv.ts
+  s_5f5f3ef2604517::t_1d7a34541d76b2 117,129,134-135,138
+  s_5f5f3ef2604517::t_08a6322f1e352d 2-41
+  s_5f5f3ef2604517::t_8ec3798ebbb446 150,152-154
+frontend/src/components/SapLogPanel.tsx
+  s_1ec0bd235949da::t_c434333ac2cc86 1-107
+DEPLOY.md
+  s_5f5f3ef2604517::t_a574a15a12b9d3 174
+backend/src/domain/validation.test.ts
+  s_5f5f3ef2604517::t_25c5e5d2252e16 2-3,5-13
+  s_5f5f3ef2604517::t_b38deb7082fc3a 4
+  s_5f5f3ef2604517::t_972616a5a0fba4 215-247
+  s_5f5f3ef2604517::t_d93ed2096b2673 147-154
+  s_5f5f3ef2604517::t_8789d8d8ca42d7 248-269
+  s_5f5f3ef2604517::t_f698294568e43e 71-104,106-107,109-111,113-133,136-146,155-159
+backend/src/services/sap/csv.test.ts
+  s_5f5f3ef2604517::t_630d073120c1bf 2,78-96,98-111,113-117,119-133
+  s_5f5f3ef2604517::t_c5796c4f5f7775 112
+  s_5f5f3ef2604517::t_a92eda2f60cd40 118
+  s_5f5f3ef2604517::t_9baa59a95f616e 97
+backend/scripts/makeSampleSo.ts
+  s_60839e153da942::t_41723926b9ed14 420-422,424
+  s_60839e153da942::t_5f2738c3d4a364 235-238,241,255
+  s_60839e153da942::t_4ab76dd3f5fb9f 360-362,367,378,381,390,398,402,408,410-412,415,418
+  s_60839e153da942::t_a308628f4c796c 300-319,321
+  s_60839e153da942::t_289f5070ad5896 23
+  s_60839e153da942::t_2129be87f0201b 142-158,164-173,182-183
+  s_60839e153da942::t_0a48c3e0e82765 1-22,24-141,159-163,174-181,184-234,239-240,242-254,256-299,320,322-359,363-366,368-377,379-380,382-389,391-397,399-401,403-407,409,413-414,416-417,419,423,425-451
+frontend/src/pages/RecordPage.tsx
+  s_5f5f3ef2604517::t_08314a60785596 12
+  s_1ec0bd235949da::t_09dd3fb8465422 395-396
+  s_5f5f3ef2604517::t_934c1ac59b3fe9 364-370
+  s_5f5f3ef2604517::t_996e13cfc3a74f 495
+  s_5f5f3ef2604517::t_e58e99367bd68b 521-528
+  s_5f5f3ef2604517::t_b68f6c029971d3 569-574,581-582,588-614
+  s_60839e153da942::t_1cb9ba3162dcb6 641,645-646
+  s_5f5f3ef2604517::t_730a4ed284c331 344
+  s_5f5f3ef2604517::t_3ffbf411672546 531,539-541
+  s_5f5f3ef2604517::t_fc9613f5847501 43
+  s_60839e153da942::t_6921bd41393555 565-568,580
+  s_5f5f3ef2604517::t_d115a59cc9d7a8 324-326,328-337
+  s_1ec0bd235949da::t_ca39e4ecaf2062 11
+  s_5f5f3ef2604517::t_eb4efd75c29749 177-181
+backend/scripts/lib/pdfSheet.ts
+  s_60839e153da942::t_549d4a88706b57 137-142,144,146-147,152,156-161
+  s_60839e153da942::t_9ccf29f8af89ed 44-51
+  s_60839e153da942::t_28c8086cb39d21 57-84
+  s_60839e153da942::t_6bc3322b1e5d0d 1-20,23-43,52-56,85-105,136,143,145,148-151,153-155,162-163
+  s_5f5f3ef2604517::t_772ebd779e171a 106-135
+  s_60839e153da942::t_ec5017b317e33d 21-22
+backend/src/services/records.ts
+  s_5f5f3ef2604517::t_694c77b8769098 609-610,613
+  s_5f5f3ef2604517::t_3aa2a40df161bc 523-533
+  s_5f5f3ef2604517::t_51b3cafd29aef0 537-543,552-563
+  s_5f5f3ef2604517::t_6caeb85a1e8c49 5
+  s_5f5f3ef2604517::t_fdf84c89234cbe 844-847
+  s_5f5f3ef2604517::t_ef7f8aeb185995 4
+  s_5f5f3ef2604517::t_9d888af4daf4d9 218-260
+  s_5f5f3ef2604517::t_dc053dd5731bd2 172-177,179-181,187
+  s_5f5f3ef2604517::t_e2142796e348ab 115-119,126
+  s_5f5f3ef2604517::t_1e532e0d9389f9 811
+  s_5f5f3ef2604517::t_9b79a09581df6e 593-597
+  s_5f5f3ef2604517::t_bece20c06be707 182-186
+  s_5f5f3ef2604517::t_26a965987fa890 398-418,421,423-460
+  s_5f5f3ef2604517::t_d208740077abd6 495-508
+  s_5f5f3ef2604517::t_b33420d33b4ad5 804
+backend/src/app.ts
+  s_1ec0bd235949da::t_012d1f49c817ba 60
+  s_1ec0bd235949da::t_fb93f8d2585b16 72
+  s_1ec0bd235949da::t_a5622290d7f668 8
+backend/src/services/sap/resultWatcher.ts
+  s_5f5f3ef2604517::t_4c2b8ba7aac3fa 35-45
+  s_5f5f3ef2604517::t_506622f9e596fc 223,225,230-247
+backend/src/modules/records/query.ts
+  s_5f5f3ef2604517::t_032a0fb11356fd 1-28
+backend/src/modules/sapLog/routes.ts
+  s_1ec0bd235949da::t_b164afd9b6c931 1-100
+backend/src/services/sap/logApi.ts
+  s_1ec0bd235949da::t_d9aa4fd43ad808 211-212,217-219
+  s_1ec0bd235949da::t_a2f6fb425c598d 92-97,100-104,171,173,186-188,203,222
+  s_1ec0bd235949da::t_01aeadc36f4dbf 175-183
+  s_1ec0bd235949da::t_03e942667503c0 1-91,98-99,105-170,172,174,184-185,189-202,204-210,213-216,220-221,223-230
+backend/src/middleware/error.test.ts
+  s_5f5f3ef2604517::t_36efba92ba522a 1-82
+backend/src/services/extraction/index.ts
+  s_5f5f3ef2604517::t_20eab936052884 130-134
+backend/src/services/sap/outbound.ts
+  s_5f5f3ef2604517::t_dfb85915e980cf 54-64,67,79-80,87,92,100-108
+backend/src/modules/records/routes.ts
+  s_5f5f3ef2604517::t_44d4b19661af75 132-133
+  s_60839e153da942::t_61e833aa1272ed 262-263
+  s_60839e153da942::t_2f57eb40b21c07 208
+  s_60839e153da942::t_8ed4b0fe36530a 28-35,37-39,44-48
+  s_60839e153da942::t_259e0a4bf76d44 143
+  s_5f5f3ef2604517::t_614bce2b38d993 216-221,223
+  s_60839e153da942::t_b6891a68fb3dec 94
+  s_5f5f3ef2604517::t_86b5d5c3f50b62 36,40-43
+  s_60839e153da942::t_e056eb92d34ac8 188-189
+  s_60839e153da942::t_e51cdc73002618 160-163,165
+  s_60839e153da942::t_cd932234dca70f 197-198
+  s_60839e153da942::t_3805412d2af471 234-235
+  s_60839e153da942::t_c0f2a6a0d60603 244-245
+  s_60839e153da942::t_14284682294d38 271-272
+  s_60839e153da942::t_b50e2df370de6c 224
+  s_60839e153da942::t_ca9937cd9c8a66 253-254
+  s_5f5f3ef2604517::t_e996abe4d4c5d0 206-207
+  s_5f5f3ef2604517::t_06001d733af24b 53,55-59
+  s_5f5f3ef2604517::t_82797e41f76d42 11
+backend/scripts/makeSamplePo.ts
+  s_5f5f3ef2604517::t_9f871b9678f0d4 48-61,63-67,69-73
+  s_5f5f3ef2604517::t_601ea2b4fdb2bf 867-868
+  s_5f5f3ef2604517::t_693ff39aaf5426 480-586,588-598,600-698,701-706,708-711,714-746,748-799
+  s_5f5f3ef2604517::t_1d599a13fa3325 898-957,961-962
+  s_5f5f3ef2604517::t_5a095ea49d1c9b 887-888
+  s_5f5f3ef2604517::t_bf14c4a94af3a3 19-23,28
+  s_5f5f3ef2604517::t_c91be247890a38 1045-1049,1053,1067-1154,1156
+  s_5f5f3ef2604517::t_971c13df561e00 1174-1177,1185-1187
+  s_5f5f3ef2604517::t_ac45aea6bd8857 2-6
+frontend/src/lib/api.ts
+  s_1ec0bd235949da::t_e5187cf8a8c4da 155-159
+  s_5f5f3ef2604517::t_7bc18aabf212a2 78,83-84
+  s_5f5f3ef2604517::t_aac5f5638e1cf9 125-131
+  s_1ec0bd235949da::t_1e444cf6fc5f3d 1
+backend/src/services/extraction/prompts.ts
+  s_5f5f3ef2604517::t_598f6c88ce6562 4
+  s_5f5f3ef2604517::t_9cae2c15de5fd1 29-31
+backend/src/middleware/error.ts
+  s_5f5f3ef2604517::t_e4c1b3ec7b3d18 1,4,14,47-92
+backend/src/domain/validation.ts
+  s_5f5f3ef2604517::t_e099b908ec9a67 248-267
+  s_5f5f3ef2604517::t_c73772d6346177 28-31,33-36,38,40,42-93,96-102,106-112,114-143,157-166
+  s_5f5f3ef2604517::t_843133e7bb179f 381
+  s_5f5f3ef2604517::t_1c5f8d55bd9450 247
+  s_5f5f3ef2604517::t_f2147cfad2548a 144-156
+  s_5f5f3ef2604517::t_f5f1939d3b82e8 350-380,382-390
+  s_5f5f3ef2604517::t_ef980386d83165 232-237
+  s_5f5f3ef2604517::t_8a128f4f8d3b60 171-177
+backend/src/services/sap/vbeln.ts
+  s_1ec0bd235949da::t_79a22460e44f9e 1-29
+backend/src/services/records.test.ts
+  s_5f5f3ef2604517::t_5f0607a9745905 1-37
+docs/01-requirements.md
+  s_5f5f3ef2604517::t_0d5eb8d012e05a 107
+backend/src/server.ts
+  s_1ec0bd235949da::t_29c1282f8e6ba4 25-34,37
+backend/src/config/env.ts
+  s_1ec0bd235949da::t_e9d780db148a69 67-85
+  s_5f5f3ef2604517::t_8cc9be34815e25 57-63
+frontend/src/pages/WorklistPage.tsx
+  s_5f5f3ef2604517::t_66a3134fae8acb 2
+  s_5f5f3ef2604517::t_b659f9d87f5047 137
+  s_5f5f3ef2604517::t_2ea3de3f4e2804 130-131
+  s_5f5f3ef2604517::t_e960f9523e198f 250-251,253
+  s_5f5f3ef2604517::t_6a59ce31c90e9e 64-69,71-76,81-95
+  s_5f5f3ef2604517::t_50fb80a3900ea0 39-41
+  s_5f5f3ef2604517::t_68473b8ccd52cd 263
+  s_5f5f3ef2604517::t_f3560a09605aeb 49-50
+  s_5f5f3ef2604517::t_6916a3614a0a4c 166-187,194
+  s_5f5f3ef2604517::t_deeab56885ccbe 364-380
+backend/src/modules/records/query.test.ts
+  s_5f5f3ef2604517::t_c8a9a9018235c7 1-48
+frontend/src/styles/app.css
+  s_1ec0bd235949da::t_2cdbb43500d668 551-554,556-564
+  s_1ec0bd235949da::t_940c0e9f8e11da 555
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "1.6.9",
+  "base_commit_sha": "1dd314efa98b41a6591efe171a0eeafd297f22fa",
+  "branch": "qa-sweep-fixes-and-sap-log",
+  "prompts": {
+    "s_1ec0bd235949da": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73b0c5e7-5749-4293-8cde-14b28cdf8a53",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "total_additions": 786,
+      "total_deletions": 21,
+      "accepted_lines": 749,
+      "overriden_lines": 0
+    },
+    "s_5f5f3ef2604517": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0f0f0f4-ee83-4844-afe9-c313999885dc",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:a8a1cf96029ef1526c2d40447691caa7f454e7f480d2d8bc4165c604ce1ad9fa",
+      "total_additions": 2817,
+      "total_deletions": 207,
+      "accepted_lines": 2856,
+      "overriden_lines": 0
+    },
+    "s_60839e153da942": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "403cf98c-4ea7-4b72-8736-09fc0ab72a04",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:f4d50acd9b22cc655704a1340f6e7031c562dd5e5cc3b8c82dfc1a8544f71aff",
+      "total_additions": 905,
+      "total_deletions": 169,
+      "accepted_lines": 743,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ecb1cf07284e37": {
+      "author": "Roger D <roger.d@innovunglobal.com>"
+    }
+  },
+  "sessions": {
+    "s_1ec0bd235949da": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73b0c5e7-5749-4293-8cde-14b28cdf8a53",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "stats": {
+        "total_additions": 786,
+        "total_deletions": 21,
+        "accepted_lines": 749,
+        "overriden_lines": 0,
+        "files": {
+          ".claude/launch.json": {
+            "total_additions": 17,
+            "total_deletions": 0,
+            "accepted_lines": 0,
+            "overriden_lines": 0
+          },
+          ".env.example": {
+            "total_additions": 16,
+            "total_deletions": 0,
+            "accepted_lines": 16,
+            "overriden_lines": 0
+          },
+          "backend/src/app.ts": {
+            "total_additions": 3,
+            "total_deletions": 0,
+            "accepted_lines": 3,
+            "overriden_lines": 0
+          },
+          "backend/src/config/env.ts": {
+            "total_additions": 19,
+            "total_deletions": 0,
+            "accepted_lines": 19,
+            "overriden_lines": 0
+          },
+          "backend/src/modules/sapLog/routes.ts": {
+            "total_additions": 100,
+            "total_deletions": 0,
+            "accepted_lines": 100,
+            "overriden_lines": 0
+          },
+          "backend/src/server.ts": {
+            "total_additions": 11,
+            "total_deletions": 0,
+            "accepted_lines": 11,
+            "overriden_lines": 0
+          },
+          "backend/src/services/audit.ts": {
+            "total_additions": 1,
+            "total_deletions": 0,
+            "accepted_lines": 1,
+            "overriden_lines": 0
+          },
+          "backend/src/services/sap/logApi.test.ts": {
+            "total_additions": 142,
+            "total_deletions": 0,
+            "accepted_lines": 142,
+            "overriden_lines": 0
+          },
+          "backend/src/services/sap/logApi.ts": {
+            "total_additions": 249,
+            "total_deletions": 19,
+            "accepted_lines": 230,
+            "overriden_lines": 0
+          },
+          "backend/src/services/sap/vbeln.test.ts": {
+            "total_additions": 27,
+            "total_deletions": 0,
+            "accepted_lines": 27,
+            "overriden_lines": 0
+          },
+          "backend/src/services/sap/vbeln.ts": {
+            "total_additions": 29,
+            "total_deletions": 0,
+            "accepted_lines": 29,
+            "overriden_lines": 0
+          },
+          "docs/02-design.md": {
+            "total_additions": 13,
+            "total_deletions": 0,
+            "accepted_lines": 13,
+            "overriden_lines": 0
+          },
+          "frontend/src/components/SapLogPanel.tsx": {
+            "total_additions": 107,
+            "total_deletions": 0,
+            "accepted_lines": 107,
+            "overriden_lines": 0
+          },
+          "frontend/src/lib/api.ts": {
+            "total_additions": 6,
+            "total_deletions": 1,
+            "accepted_lines": 6,
+            "overriden_lines": 0
+          },
+          "frontend/src/lib/types.ts": {
+            "total_additions": 28,
+            "total_deletions": 0,
+            "accepted_lines": 28,
+            "overriden_lines": 0
+          },
+          "frontend/src/pages/RecordPage.tsx": {
+            "total_additions": 3,
+            "total_deletions": 0,
+            "accepted_lines": 3,
+            "overriden_lines": 0
+          },
+          "frontend/src/styles/app.css": {
+            "total_additions": 15,
+            "total_deletions": 1,
+            "accepted_lines": 14,
+            "overriden_lines": 0
+          }
+        }
+      }
+    },
+    "s_5f5f3ef2604517": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0f0f0f4-ee83-4844-afe9-c313999885dc",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:a8a1cf96029ef1526c2d40447691caa7f454e7f480d2d8bc4165c604ce1ad9fa",
+      "stats": {
+        "total_additions": 2817,
+        "total_deletions": 207,
+        "accepted_lines": 2856,
+        "overriden_lines": 0,
+        "files": {
+          ".env.example": {
+            "total_additions": 5,
+            "total_deletions": 0,
+            "accepted_lines": 5,
+            "overriden_lines": 0
+          },
+          "DEPLOY.md": {
+            "total_additions": 1,
+            "total_deletions": 1,
+            "accepted_lines": 1,
+            "overriden_lines": 0
+          },
+          "README.md": {
+            "total_additions": 16,
+            "total_deletions": 9,
+            "accepted_lines": 16,
+            "overriden_lines": 0
+          },
+          "backend/prisma/seed.ts": {
+            "total_additions": 20,
+            "total_deletions": 2,
+            "accepted_lines": 20,
+            "overriden_lines": 0
+          },
+          "backend/scripts/lib/pdfSheet.ts": {
+            "total_additions": 30,
+            "total_deletions": 0,
+            "accepted_lines": 30,
+            "overriden_lines": 0
+          },
+          "backend/scripts/makeSamplePo.ts": {
+            "total_additions": 526,
+            "total_deletions": 13,
+            "accepted_lines": 526,
+            "overriden_lines": 0
+          },
+          "backend/src/config/env.ts": {
+            "total_additions": 7,
+            "total_deletions": 0,
+            "accepted_lines": 7,
+            "overriden_lines": 0
+          },
+          "backend/src/domain/acknowledgement.test.ts": {
+            "total_additions": 63,
+            "total_deletions": 3,
+            "accepted_lines": 60,
+            "overriden_lines": 0
+          },
+          "backend/src/domain/acknowledgement.ts": {
+            "total_additions": 54,
+            "total_deletions": 0,
+            "accepted_lines": 54,
+            "overriden_lines": 0
+          },
+          "backend/src/domain/sentBack.test.ts": {
+            "total_additions": 54,
+            "total_deletions": 0,
+            "accepted_lines": 54,
+            "overriden_lines": 0
+          },
+          "backend/src/domain/sentBack.ts": {
+            "total_additions": 39,
+            "total_deletions": 0,
+            "accepted_lines": 39,
+            "overriden_lines": 0
+          },
+          "backend/src/domain/validation.test.ts": {
+            "total_additions": 151,
+            "total_deletions": 4,
+            "accepted_lines": 151,
+            "overriden_lines": 0
+          },
+          "backend/src/domain/validation.ts": {
+            "total_additions": 206,
+            "total_deletions": 26,
+            "accepted_lines": 204,
+            "overriden_lines": 0
+          },
+          "backend/src/middleware/error.test.ts": {
+            "total_additions": 82,
+            "total_deletions": 0,
+            "accepted_lines": 82,
+            "overriden_lines": 0
+          },
+          "backend/src/middleware/error.ts": {
+            "total_additions": 49,
+            "total_deletions": 4,
+            "accepted_lines": 49,
+            "overriden_lines": 0
+          },
+          "backend/src/modules/records/query.test.ts": {
+            "total_additions": 48,
+            "total_deletions": 0,
+            "accepted_lines": 48,
+            "overriden_lines": 0
+          },
+          "backend/src/modules/records/query.ts": {
+            "total_additions": 28,
+            "total_deletions": 0,
+            "accepted_lines": 28,
+            "overriden_lines": 0
+          },
+          "backend/src/modules/records/routes.ts": {
+            "total_additions": 23,
+            "total_deletions": 20,
+            "accepted_lines": 23,
+            "overriden_lines": 0
+          },
+          "backend/src/services/audit.ts": {
+            "total_additions": 2,
+            "total_deletions": 0,
+            "accepted_lines": 2,
+            "overriden_lines": 0
+          },
+          "backend/src/services/extraction/index.ts": {
+            "total_additions": 5,
+            "total_deletions": 1,
+            "accepted_lines": 5,
+            "overriden_lines": 0
+          },
+          "backend/src/services/extraction/prompts.test.ts": {
+            "total_additions": 31,
+            "total_deletions": 2,
+            "accepted_lines": 29,
+            "overriden_lines": 0
+          },
+          "backend/src/services/extraction/prompts.ts": {
+            "total_additions": 4,
+            "total_deletions": 2,
+            "accepted_lines": 4,
+            "overriden_lines": 0
+          },
+          "backend/src/services/records.acknowledge.test.ts": {
+            "total_additions": 115,
+            "total_deletions": 0,
+            "accepted_lines": 115,
+            "overriden_lines": 0
+          },
+          "backend/src/services/records.approve.test.ts": {
+            "total_additions": 162,
+            "total_deletions": 6,
+            "accepted_lines": 156,
+            "overriden_lines": 0
+          },
+          "backend/src/services/records.metadata.test.ts": {
+            "total_additions": 140,
+            "total_deletions": 0,
+            "accepted_lines": 140,
+            "overriden_lines": 0
+          },
+          "backend/src/services/records.test.ts": {
+            "total_additions": 37,
+            "total_deletions": 0,
+            "accepted_lines": 37,
+            "overriden_lines": 0
+          },
+          "backend/src/services/records.ts": {
+            "total_additions": 192,
+            "total_deletions": 42,
+            "accepted_lines": 186,
+            "overriden_lines": 0
+          },
+          "backend/src/services/sap/csv.test.ts": {
+            "total_additions": 62,
+            "total_deletions": 6,
+            "accepted_lines": 133,
+            "overriden_lines": 0
+          },
+          "backend/src/services/sap/csv.ts": {
+            "total_additions": 49,
+            "total_deletions": 9,
+            "accepted_lines": 49,
+            "overriden_lines": 0
+          },
+          "backend/src/services/sap/outbound.test.ts": {
+            "total_additions": 103,
+            "total_deletions": 1,
+            "accepted_lines": 102,
+            "overriden_lines": 0
+          },
+          "backend/src/services/sap/outbound.ts": {
+            "total_additions": 25,
+            "total_deletions": 12,
+            "accepted_lines": 25,
+            "overriden_lines": 0
+          },
+          "backend/src/services/sap/resultWatcher.ts": {
+            "total_additions": 32,
+            "total_deletions": 3,
+            "accepted_lines": 32,
+            "overriden_lines": 0
+          },
+          "docs/01-requirements.md": {
+            "total_additions": 1,
+            "total_deletions": 1,
+            "accepted_lines": 1,
+            "overriden_lines": 0
+          },
+          "docs/02-design.md": {
+            "total_additions": 39,
+            "total_deletions": 4,
+            "accepted_lines": 38,
+            "overriden_lines": 0
+          },
+          "frontend/src/lib/api.ts": {
+            "total_additions": 10,
+            "total_deletions": 1,
+            "accepted_lines": 10,
+            "overriden_lines": 0
+          },
+          "frontend/src/lib/types.ts": {
+            "total_additions": 10,
+            "total_deletions": 0,
+            "accepted_lines": 10,
+            "overriden_lines": 0
+          },
+          "frontend/src/pages/LoginPage.tsx": {
+            "total_additions": 4,
+            "total_deletions": 4,
+            "accepted_lines": 2,
+            "overriden_lines": 0
+          },
+          "frontend/src/pages/RecordPage.tsx": {
+            "total_additions": 76,
+            "total_deletions": 5,
+            "accepted_lines": 76,
+            "overriden_lines": 0
+          },
+          "frontend/src/pages/WorklistPage.tsx": {
+            "total_additions": 82,
+            "total_deletions": 17,
+            "accepted_lines": 81,
+            "overriden_lines": 0
+          },
+          "samples/README.md": {
+            "total_additions": 33,
+            "total_deletions": 9,
+            "accepted_lines": 25,
+            "overriden_lines": 0
+          },
+          "samples/po-multipage.pdf": {
+            "total_additions": 201,
+            "total_deletions": 0,
+            "accepted_lines": 201,
+            "overriden_lines": 0
+          }
+        }
+      }
+    },
+    "s_60839e153da942": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "403cf98c-4ea7-4b72-8736-09fc0ab72a04",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:f4d50acd9b22cc655704a1340f6e7031c562dd5e5cc3b8c82dfc1a8544f71aff",
+      "stats": {
+        "total_additions": 905,
+        "total_deletions": 169,
+        "accepted_lines": 743,
+        "overriden_lines": 0,
+        "files": {
+          "backend/samples/so-compact.pdf": {
+            "total_additions": 74,
+            "total_deletions": 0,
+            "accepted_lines": 0,
+            "overriden_lines": 0
+          },
+          "backend/scripts/lib/pdfSheet.ts": {
+            "total_additions": 136,
+            "total_deletions": 3,
+            "accepted_lines": 133,
+            "overriden_lines": 0
+          },
+          "backend/scripts/makeSamplePo.ts": {
+            "total_additions": 1,
+            "total_deletions": 54,
+            "accepted_lines": 0,
+            "overriden_lines": 0
+          },
+          "backend/scripts/makeSampleSo.ts": {
+            "total_additions": 494,
+            "total_deletions": 43,
+            "accepted_lines": 451,
+            "overriden_lines": 0
+          },
+          "backend/src/modules/records/routes.ts": {
+            "total_additions": 42,
+            "total_deletions": 25,
+            "accepted_lines": 39,
+            "overriden_lines": 0
+          },
+          "frontend/src/pages/RecordPage.tsx": {
+            "total_additions": 8,
+            "total_deletions": 4,
+            "accepted_lines": 8,
+            "overriden_lines": 0
+          },
+          "samples/README.md": {
+            "total_additions": 39,
+            "total_deletions": 3,
+            "accepted_lines": 38,
+            "overriden_lines": 0
+          },
+          "samples/so-compact.pdf": {
+            "total_additions": 111,
+            "total_deletions": 37,
+            "accepted_lines": 74,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  }
+}
