@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { StatusBadge } from '../components/StatusBadge';
@@ -36,6 +36,9 @@ const keyOf = (r: WorklistRow, k: SortKey): string | number => {
   }
 };
 
+/** Rows fetched per page; the server caps a page at 200. */
+const PAGE_SIZE = 50;
+
 export function WorklistPage() {
   const [view, setView] = useState('all');
   const [q, setQ] = useState('');
@@ -43,6 +46,8 @@ export function WorklistPage() {
   const [debouncedQ, setDebouncedQ] = useState('');
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'age', dir: -1 });
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [over, setOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -56,13 +61,38 @@ export function WorklistPage() {
     return () => clearTimeout(t);
   }, [q]);
 
-  const list = useQuery({
+  const filters = { status: active.statuses?.join(','), mine: active.mine, q: debouncedQ || undefined };
+
+  // The list is paged: the footer says how much of it is on screen, and "Show more"
+  // fetches the rest. It used to fetch one page and say nothing, so with more than 50
+  // records the older ones were simply unreachable except by searching for them.
+  const list = useInfiniteQuery({
     queryKey: ['records', view, debouncedQ],
-    queryFn: () =>
-      api.list({ status: active.statuses?.join(','), mine: active.mine, q: debouncedQ || undefined }),
+    queryFn: ({ pageParam }) => api.list({ ...filters, take: PAGE_SIZE, skip: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (last, pages) => {
+      const loaded = pages.reduce((n, p) => n + p.rows.length, 0);
+      return loaded < last.total ? loaded : undefined;
+    },
     // FR-12.7 — statuses move on their own, so the list refreshes itself.
     refetchInterval: 4000,
   });
+
+  // A record moving between pages mid-refresh can appear on two of them; show it once.
+  const loaded = useMemo(() => {
+    const seen = new Set<string>();
+    const out: WorklistRow[] = [];
+    for (const page of list.data?.pages ?? []) {
+      for (const row of page.rows) {
+        if (!seen.has(row.id)) {
+          seen.add(row.id);
+          out.push(row);
+        }
+      }
+    }
+    return out;
+  }, [list.data]);
+  const matching = list.data ? list.data.pages[list.data.pages.length - 1]!.total : 0;
 
   const counts = useQuery({ queryKey: ['counts'], queryFn: api.counts, refetchInterval: 4000 });
 
@@ -97,16 +127,14 @@ export function WorklistPage() {
     return v.statuses.reduce((sum, s) => sum + (counts.data![s] ?? 0), 0);
   };
 
-  const rows = useMemo(() => {
-    const r = [...(list.data?.rows ?? [])];
-    r.sort((a, b) => {
+  const sortRows = (input: WorklistRow[]) =>
+    [...input].sort((a, b) => {
       const x = keyOf(a, sort.key);
       const y = keyOf(b, sort.key);
       if (x === y) return 0;
       return (x > y ? 1 : -1) * sort.dir;
     });
-    return r;
-  }, [list.data, sort]);
+  const rows = useMemo(() => sortRows(loaded), [loaded, sort]);
 
   const onSort = (key: SortKey) =>
     setSort((s) => (s.key === key ? { key, dir: (s.dir === 1 ? -1 : 1) as 1 | -1 } : { key, dir: 1 }));
@@ -135,15 +163,35 @@ export function WorklistPage() {
     upload.mutate(file);
   };
 
-  /** FR-12.6 — export exactly what is on screen: current view, search and sort. */
-  const exportCsv = () => {
+  /**
+   * FR-12.6 — export the current view, search and sort. "The current view" is every record
+   * that matches, not just the pages loaded so far: exporting the visible 50 of 57 would
+   * hand over a file that looks complete and is not.
+   */
+  const exportCsv = async () => {
+    setExportError(null);
+    setExporting(true);
+    let all: WorklistRow[];
+    try {
+      all = [];
+      for (;;) {
+        const page = await api.list({ ...filters, take: 200, skip: all.length });
+        all.push(...page.rows);
+        if (!page.rows.length || all.length >= page.total) break;
+      }
+    } catch (err) {
+      setExportError(err instanceof ApiError ? err.message : 'The export could not be fetched.');
+      return;
+    } finally {
+      setExporting(false);
+    }
     const esc = (v: string | null | undefined) => {
       const s = (v ?? '').replace(/\r?\n/g, ' ');
       return /[",]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
     const lines = [
       'Status,PO number,Customer,Customer code,Lines,Value,Currency,SO number,Uploaded by,File,Correlation id,Status changed',
-      ...rows.map((r) =>
+      ...sortRows(all).map((r) =>
         [
           r.status,
           r.header?.poNumber,
@@ -199,10 +247,10 @@ export function WorklistPage() {
               <button
                 className="quiet sm"
                 onClick={exportCsv}
-                disabled={!rows.length}
-                title="Download the current view as CSV"
+                disabled={!rows.length || exporting}
+                title="Download every record in the current view as CSV"
               >
-                Export CSV
+                {exporting ? 'Exporting…' : 'Export CSV'}
               </button>
               <button className="primary" onClick={() => fileRef.current?.click()} disabled={upload.isPending}>
                 {upload.isPending ? 'Uploading…' : 'Upload PO PDF'}
@@ -212,6 +260,7 @@ export function WorklistPage() {
         </div>
 
         {uploadError && <div className="err" role="alert">{uploadError}</div>}
+        {exportError && <div className="err" role="alert">{exportError}</div>}
 
         <div className="tabrule" role="group" aria-label="Filter by state">
           {VIEWS.map((v) => {
@@ -312,7 +361,23 @@ export function WorklistPage() {
           </div>
         )}
         <p className="cap" style={{ marginTop: 10 }}>
-          {list.data ? `${list.data.total} record${list.data.total === 1 ? '' : 's'}` : ''}
+          {list.data &&
+            (list.hasNextPage
+              ? `Showing ${rows.length} of ${matching} records`
+              : `${matching} record${matching === 1 ? '' : 's'}`)}
+          {list.hasNextPage && (
+            <>
+              {' · '}
+              <button
+                className="quiet sm"
+                onClick={() => list.fetchNextPage()}
+                disabled={list.isFetchingNextPage}
+              >
+                {list.isFetchingNextPage ? 'Loading…' : `Show ${Math.min(PAGE_SIZE, matching - rows.length)} more`}
+              </button>
+              {(sort.key !== 'age' || sort.dir !== -1) && ' · sorted within the records shown'}
+            </>
+          )}
         </p>
       </div>
     </div>

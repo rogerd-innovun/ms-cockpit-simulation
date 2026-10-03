@@ -32,7 +32,17 @@ async function isComplete(dir: string, filename: string): Promise<boolean> {
 async function moveTo(destDir: string, sourcePath: string, filename: string): Promise<void> {
   const dated = path.join(destDir, new Date().toISOString().slice(0, 10));
   await fs.mkdir(dated, { recursive: true });
-  await fs.rename(sourcePath, path.join(dated, filename));
+  // A second file with the same name on the same day is not a replacement: result files
+  // are named after the correlation ID and attempt, so a re-delivery is exactly what
+  // lands here, and both copies are evidence (FR-10.6, FR-10.10). Number it instead of
+  // letting the rename overwrite the first.
+  const ext = path.extname(filename);
+  const stem = path.basename(filename, ext);
+  let target = path.join(dated, filename);
+  for (let n = 1; await fs.access(target).then(() => true, () => false); n++) {
+    target = path.join(dated, `${stem}.${n}${ext}`);
+  }
+  await fs.rename(sourcePath, target);
 }
 
 /** Removes the marker that accompanied a consumed data file, if the convention uses one. */
@@ -210,12 +220,31 @@ export async function scanResultFolder(): Promise<number> {
     try {
       if (!(await isComplete(env.paths.inbound, filename))) continue;
 
-      // FR-10.9 — already seen this exact file; drop the leftovers and move on.
+      // FR-10.9 — already processed this exact file; drop the leftovers and move on.
       const seen = await prisma.sapResult.findUnique({ where: { sourceFilename: filename } });
-      if (seen) {
+      if (seen && !seen.quarantined) {
         await removeMarker(env.paths.inbound, filename);
         await moveTo(env.paths.archive, sourcePath, filename);
         continue;
+      }
+      if (seen) {
+        // A quarantined file was never processed, so its name must not count as "seen".
+        // Result files are named RESULT_<correlationId>_<attempt>, so when SAP fixes what
+        // it sent and delivers it again it arrives under the same name — and treating
+        // that as a duplicate would bin the correction and leave the record waiting for
+        // the SLA timeout. The old row stays (quarantine is evidence) under a name that
+        // can no longer collide.
+        await prisma.sapResult.update({
+          where: { id: seen.id },
+          data: { sourceFilename: `${filename}~quarantined-${seen.id.slice(0, 8)}` },
+        });
+        await writeAudit({
+          recordId: seen.recordId,
+          eventType: 'RESULT_REDELIVERED',
+          message: `${filename} arrived again after being quarantined (${seen.quarantineReason ?? 'no reason recorded'}); processing the new copy.`,
+          actorName: 'sap-result-watcher',
+        });
+        log.warn({ filename }, 'result re-delivered after quarantine; processing the new copy');
       }
 
       const content = await fs.readFile(sourcePath, 'utf8');

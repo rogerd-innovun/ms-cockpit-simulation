@@ -1,7 +1,7 @@
 import { HEADER_FIELDS, HEADER_LABELS, LINE_FIELDS, LINE_LABELS } from '../../domain/types.js';
 
 /** Bumped whenever the prompt text changes; stored on every run (FR-4.4). */
-export const GENERIC_PROMPT_VERSION = 'generic-v1';
+export const GENERIC_PROMPT_VERSION = 'generic-v2';
 
 const headerFieldList = HEADER_FIELDS.map((f) => `  - ${f} (${HEADER_LABELS[f]})`).join('\n');
 const lineFieldList = LINE_FIELDS.map((f) => `  - ${f} (${LINE_LABELS[f]})`).join('\n');
@@ -26,7 +26,9 @@ Rules:
 2. If a field is not present in the document, return null for its value. Never invent, infer or complete a value that is not written on the page.
 3. Number every line item sequentially starting at 1, in the order they appear. If the document prints its own line numbers, use those.
 4. Include every line item, including ones that continue across a page break. Do not merge or split lines.
-5. Ignore totals, subtotals, tax rows, freight rows and notes when building lineItems — those are not ordered materials. Put the order total in the header field poTotalValue.
+5. Ignore totals, subtotals, tax rows, freight rows and notes when building lineItems — those are not ordered materials.
+6. Put the order total in the header field poTotalValue, and be careful which total it is. poTotalValue is the value of the goods ordered: the figure that equals the sum of the line item values, BEFORE tax (VAT, TVA, GST, HST, sales tax), freight, handling, fuel and other surcharges. Many documents print several totals — for example "Total HT / TVA / Total TTC", "Subtotal / Freight / Tax / Total due", "Net total / VAT / Gross total". Choose the pre-tax goods total (Total HT, Subtotal, Net total, Basic Total), never the grand total, amount due or gross total. Only when a document prints a single total, and its prices already include tax, use that one as printed. Copy a figure that is printed on the page; do not add up, subtract or calculate a total yourself.
+7. Where a line shows a list price, a discount and a net price, unitPrice is the NET price (the one that, multiplied by the quantity, gives the line value) and lineNetValue is the line's extended amount.
 
 Confidence scoring — this is critical:
 - Report a confidence between 0.0 and 1.0 for every field, including fields you return as null.

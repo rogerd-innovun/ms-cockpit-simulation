@@ -25,43 +25,155 @@ const TOTAL_TOLERANCE = 0.01;
 const ISO_4217 = /^[A-Z]{3}$/;
 
 /**
- * FR-5.8 — normalise a numeric string written in either convention.
+ * FR-5.8 — the canonical form of a numeric string written in either convention: digits,
+ * an optional leading minus and a "." decimal point, no grouping. Null when it cannot be
+ * read, rather than guessing.
+ *
  * "1,234.56" and "1.234,56" both mean the same thing; which one a vendor uses is not
- * something we get to choose, so decide from whichever separator appears last.
+ * something we get to choose, so the decimal separator is whichever one appears last.
+ * A separator that repeats on its own ("1.234.567", "1,23,456") can only be grouping.
+ * The fraction digits are kept as written ("1,599.50" stays "1599.50"), because that is
+ * what goes to SAP.
  */
-export function parseDecimal(raw: string | null | undefined): number | null {
+export function normaliseDecimal(raw: string | null | undefined): string | null {
   if (raw == null) return null;
-  const s = raw.replace(/[^\d,.\-]/g, '').trim();
+  const s = raw.replace(/[^\d,.\-]/g, '');
   if (!s) return null;
-  const lastComma = s.lastIndexOf(',');
-  const lastDot = s.lastIndexOf('.');
-  let normalised: string;
-  if (lastComma === -1 && lastDot === -1) normalised = s;
-  else if (lastComma > lastDot) normalised = s.replace(/\./g, '').replace(',', '.');
-  else normalised = s.replace(/,/g, '');
-  const n = Number(normalised);
-  return Number.isFinite(n) ? n : null;
+  const negative = s.startsWith('-');
+  const body = negative ? s.slice(1) : s;
+  if (body.includes('-')) return null;
+
+  const count = (ch: string) => body.split(ch).length - 1;
+  const commas = count(',');
+  const dots = count('.');
+
+  let out: string;
+  if (commas === 0 && dots === 0) out = body;
+  else if (commas > 0 && dots > 0) {
+    const decimal = body.lastIndexOf(',') > body.lastIndexOf('.') ? ',' : '.';
+    const group = decimal === ',' ? '.' : ',';
+    if (count(decimal) !== 1) return null;
+    out = body.split(group).join('').replace(decimal, '.');
+  } else {
+    const sep = commas > 0 ? ',' : '.';
+    out = commas + dots === 1 ? body.replace(sep, '.') : body.split(sep).join('');
+  }
+
+  if (out.startsWith('.')) out = `0${out}`;
+  if (out.endsWith('.')) out = out.slice(0, -1);
+  if (!/^\d+(\.\d+)?$/.test(out)) return null;
+  return negative ? `-${out}` : out;
 }
 
-/** Accepts ISO and the common European/US written forms. */
+export function parseDecimal(raw: string | null | undefined): number | null {
+  const n = normaliseDecimal(raw);
+  return n === null ? null : Number(n);
+}
+
+/**
+ * A lone separator followed by exactly three digits ("1,234", "1.234") is either a
+ * thousands mark or a three-place decimal, and nothing in the text says which. It is
+ * read as a decimal; the reviewer is asked to confirm, because guessing wrong turns a
+ * quantity of 1,000 into 1.
+ */
+export function isAmbiguousDecimal(raw: string | null | undefined): boolean {
+  if (raw == null) return false;
+  return /^-?[1-9]\d{0,2}[.,]\d{3}$/.test(raw.replace(/[^\d,.\-]/g, ''));
+}
+
+const MONTH_NAMES = [
+  'january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december',
+];
+const WEEKDAYS = /^(mon|tue|wed|thu|fri|sat|sun)[a-z]*$/;
+
+/** A real calendar date at UTC midnight, or null — Date.UTC alone rolls 31 Feb into March. */
+function utcDate(y: number, m: number, d: number): Date | null {
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d ? dt : null;
+}
+
+/**
+ * Reads the forms purchase orders are actually written in: ISO, Y/M/D, D/M/Y with . / -
+ * (day first), compact YYYYMMDD, and month names in either order ("17 Sep 2026",
+ * "September 17, 2026", "17-SEP-2026"). Anything else is null, and so is an impossible
+ * date. There is deliberately no fallback to `new Date(text)`: it reads non-ISO text in
+ * the server's local timezone, so the same PO would give different dates on different hosts.
+ */
 export function parseDate(raw: string | null | undefined): Date | null {
   if (!raw) return null;
   const s = raw.trim();
-  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-  if (iso) {
-    const d = new Date(Date.UTC(+iso[1]!, +iso[2]! - 1, +iso[3]!));
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
+
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/.exec(s) ?? /^(\d{4})[./](\d{1,2})[./](\d{1,2})$/.exec(s);
+  if (iso) return utcDate(+iso[1]!, +iso[2]!, +iso[3]!);
+
+  const compact = /^(\d{4})(\d{2})(\d{2})$/.exec(s);
+  if (compact) return utcDate(+compact[1]!, +compact[2]!, +compact[3]!);
+
   const dmy = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/.exec(s);
-  if (dmy) {
-    const d = new Date(Date.UTC(+dmy[3]!, +dmy[2]! - 1, +dmy[1]!));
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
-  const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? null : d;
+  if (dmy) return utcDate(+dmy[3]!, +dmy[2]!, +dmy[1]!);
+
+  const tokens = s
+    .toLowerCase()
+    .replace(/(\d)(st|nd|rd|th)\b/g, '$1')
+    .split(/[\s,./-]+/)
+    .filter((t) => t && !WEEKDAYS.test(t));
+  if (tokens.length !== 3) return null;
+  const monthIdx = tokens.findIndex((t) => /^[a-z]{3,}$/.test(t));
+  const month = monthIdx === -1 ? -1 : MONTH_NAMES.findIndex((m) => m.startsWith(tokens[monthIdx]!));
+  if (month === -1) return null;
+  const rest = tokens.filter((_, i) => i !== monthIdx);
+  const year = rest.find((t) => /^\d{4}$/.test(t));
+  const day = rest.find((t) => t !== year && /^\d{1,2}$/.test(t));
+  if (!year || !day) return null;
+  return utcDate(+year, month + 1, +day);
+}
+
+/**
+ * "03/04/2026" is 3 April in most of the world and 4 March in the US. It is read day
+ * first; when both readings are valid and differ, the reviewer is asked to confirm.
+ */
+export function isAmbiguousDate(raw: string | null | undefined): boolean {
+  const m = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/.exec((raw ?? '').trim());
+  if (!m) return false;
+  const a = +m[1]!;
+  const b = +m[2]!;
+  return a <= 12 && b <= 12 && a !== b;
+}
+
+/**
+ * A numeric date with a first part above 12 ("18/09/2026") can only be day first. One of
+ * those anywhere on the order shows how the whole document writes its dates, so the other
+ * numeric dates on it ("05/10/2026") are not really in doubt and should not each ask for
+ * a decision.
+ */
+export function documentProvesDayFirst(dates: (string | null | undefined)[]): boolean {
+  return dates.some((raw) => {
+    const m = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/.exec((raw ?? '').trim());
+    return !!m && +m[1]! > 12 && +m[2]! <= 12;
+  });
+}
+
+export type DateFormat = 'iso' | 'yyyymmdd' | 'dd.mm.yyyy';
+
+/** A parsed date written out in the configured form (CSV_DATE_FORMAT). */
+export function formatDate(d: Date, format: DateFormat): string {
+  const y = String(d.getUTCFullYear()).padStart(4, '0');
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  if (format === 'yyyymmdd') return `${y}${m}${day}`;
+  if (format === 'dd.mm.yyyy') return `${day}.${m}.${y}`;
+  return `${y}-${m}-${day}`;
 }
 
 const isBlank = (v: string | null | undefined) => v == null || v.trim() === '';
+
+const ambiguousNumber = (fieldPath: string, label: string, raw: string): ValidationIssue => ({
+  code: 'AMBIGUOUS_NUMBER',
+  severity: 'WARNING',
+  fieldPath,
+  message: `${label} "${raw}" could be ${normaliseDecimal(raw)} or ${raw.replace(/[^\d\-]/g, '')}. It is read as ${normaliseDecimal(raw)}; check the PDF.`,
+});
 
 export type HeaderWithLines = POHeader & { lineItems: POLineItem[] };
 
@@ -117,6 +229,12 @@ export async function validateRecord(
     });
   }
 
+  const dayFirstProven = documentProvesDayFirst([
+    header.poDate,
+    header.requestedDeliveryDate,
+    ...header.lineItems.map((l) => l.deliveryDate),
+  ]);
+
   for (const field of ['poDate', 'requestedDeliveryDate'] as const) {
     const raw = header[field];
     if (!isBlank(raw) && !parseDate(raw)) {
@@ -126,6 +244,27 @@ export async function validateRecord(
         fieldPath: headerFieldPath(field),
         message: `${HEADER_LABELS[field]} "${raw}" could not be read as a date.`,
       });
+    } else if (!dayFirstProven && isAmbiguousDate(raw)) {
+      issues.push({
+        code: 'AMBIGUOUS_DATE',
+        severity: 'WARNING',
+        fieldPath: headerFieldPath(field),
+        message: `${HEADER_LABELS[field]} "${raw}" is read day first (${formatDate(parseDate(raw)!, 'iso')}). Check the PDF if it may be month first.`,
+      });
+    }
+  }
+
+  // The figures that go to SAP must be readable as numbers; a blank is allowed, text is not.
+  if (!isBlank(header.poTotalValue)) {
+    if (parseDecimal(header.poTotalValue) === null) {
+      issues.push({
+        code: 'INVALID_NUMBER',
+        severity: 'BLOCKING',
+        fieldPath: headerFieldPath('poTotalValue'),
+        message: `${HEADER_LABELS.poTotalValue} "${header.poTotalValue}" is not a number.`,
+      });
+    } else if (isAmbiguousDecimal(header.poTotalValue)) {
+      issues.push(ambiguousNumber(headerFieldPath('poTotalValue'), HEADER_LABELS.poTotalValue, header.poTotalValue!));
     }
   }
 
@@ -206,6 +345,47 @@ export async function validateRecord(
         fieldPath: lineFieldPath(line.lineNumber, 'quantity'),
         message: `Line ${line.lineNumber}: quantity must be greater than zero.`,
       });
+    }
+
+    for (const field of ['unitPrice', 'lineNetValue'] as const) {
+      const raw = line[field];
+      if (isBlank(raw)) continue;
+      if (parseDecimal(raw) === null) {
+        issues.push({
+          code: 'INVALID_NUMBER',
+          severity: 'BLOCKING',
+          fieldPath: lineFieldPath(line.lineNumber, field),
+          message: `Line ${line.lineNumber}: ${LINE_LABELS[field].toLowerCase()} "${raw}" is not a number.`,
+        });
+      }
+    }
+    for (const field of ['quantity', 'unitPrice', 'lineNetValue'] as const) {
+      if (isAmbiguousDecimal(line[field]) && parseDecimal(line[field]) !== null) {
+        issues.push(
+          ambiguousNumber(
+            lineFieldPath(line.lineNumber, field),
+            `Line ${line.lineNumber}: ${LINE_LABELS[field].toLowerCase()}`,
+            line[field]!,
+          ),
+        );
+      }
+    }
+    if (!isBlank(line.deliveryDate)) {
+      if (!parseDate(line.deliveryDate)) {
+        issues.push({
+          code: 'INVALID_DATE',
+          severity: 'BLOCKING',
+          fieldPath: lineFieldPath(line.lineNumber, 'deliveryDate'),
+          message: `Line ${line.lineNumber}: delivery date "${line.deliveryDate}" could not be read as a date.`,
+        });
+      } else if (!dayFirstProven && isAmbiguousDate(line.deliveryDate)) {
+        issues.push({
+          code: 'AMBIGUOUS_DATE',
+          severity: 'WARNING',
+          fieldPath: lineFieldPath(line.lineNumber, 'deliveryDate'),
+          message: `Line ${line.lineNumber}: delivery date "${line.deliveryDate}" is read day first (${formatDate(parseDate(line.deliveryDate)!, 'iso')}). Check the PDF if it may be month first.`,
+        });
+      }
     }
 
     const price = parseDecimal(line.unitPrice);

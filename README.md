@@ -40,26 +40,32 @@ npm run dev
 
 | Email | Role | Can approve? |
 |---|---|---|
-| `clerk@cockpit.local` | Uploader | no |
+| `uploader@cockpit.local` | Uploader | no |
 | `approver@cockpit.local` | Approver | yes — but not their own uploads |
 | `ops@cockpit.local` | Operations | no |
 | `admin@cockpit.local` | Administrator | yes |
 
-Segregation of duties is on by default (`SOD_REQUIRE_SEPARATE_APPROVER=true`), so upload as the clerk and approve as the approver.
+Segregation of duties is on by default (`SOD_REQUIRE_SEPARATE_APPROVER=true`), so upload as the uploader and approve as the approver.
 
 ### Need a PO to test with?
 
-Ready-made PDFs live in [`samples/`](samples/) — eight industry-realistic layouts
-(UK, German, US, Indian, Swedish; a fax-style **scan with no text layer** that
-proves extraction works on images; a **multi-column** page; and a **prose letter**
-where the order lives inside sentences). Or generate one:
+Ready-made PDFs live in [`samples/`](samples/) — thirteen industry-realistic layouts
+(UK, German, US, Indian, Swedish, French, Italian, Canadian; a fax-style **scan with no
+text layer** and a second, **skewed and faded** one; a **multi-column** page; a
+**prose letter** where the order lives inside sentences; a **two-page** order; and
+ones with **discount columns**, **several totals** and **per-line delivery dates**).
+Or generate one:
 
 ```bash
-npm -w backend exec tsx scripts/makeSamplePo.ts /tmp/po.pdf --vendor=northwind
+npm -w backend exec tsx scripts/makeSamplePo.ts -- samples/po.pdf --vendor=northwind
 # vendors: northwind | mock | apex | shakti | nordica | scan | columns | letter
+#          multipage | bondecommande | ordine | discounts | skewscan
 ```
 
-Four of the eight match a seeded vendor profile; the rest deliberately exercise
+The `--` matters: without it npm swallows `--vendor` and you silently get the default
+layout.
+
+Four of the thirteen match a seeded vendor profile; the rest deliberately exercise
 the generic-prompt fallback.
 
 ---
@@ -112,7 +118,7 @@ integration/
 |---|---|
 | `npm run dev` | API + web + SAP simulator |
 | `npm run dev:api` / `dev:web` / `sap:sim` | one at a time |
-| `npm test` | 38 unit tests on the correctness-critical paths |
+| `npm test` | Unit tests on the correctness-critical paths (status machine, validation, CSV and file handoff, result parsing, error handling, the approval race) |
 | `npm -w backend run prisma:studio` | browse the database |
 | `npm run db:up` / `db:down` | Postgres container |
 
@@ -154,6 +160,7 @@ npm -w backend exec tsx scripts/makeSamplePo.ts -- "$d\po2.pdf" --vendor=mock
 | `CONFIDENCE_THRESHOLD` | `0.85` | Below this, a field is flagged for the reviewer. |
 | `SOD_REQUIRE_SEPARATE_APPROVER` | `true` | Whether an uploader may approve their own record (OQ-01). |
 | `CSV_LAYOUT` | `single_file` | `single_file` (REC_TYPE marker) or `header_lines_pair`. Both implemented — OQ-03 is still open. |
+| `CSV_DATE_FORMAT` / `CSV_DECIMAL_SEPARATOR` | `iso` / `.` | What SAP receives, whatever the PO printed (`SEP 17, 2026`, `1.234,56`). Dates: `iso`, `yyyymmdd` or `dd.mm.yyyy`. Also provisional until OQ-03 closes. |
 | `COMPLETENESS_CONVENTION` | `done_marker` | `done_marker` or atomic `rename`. Both implemented — OQ-04 is still open. |
 | `SAP_SLA_TIMEOUT_MS` | 1 hour | After this, a record stuck in *Sent to SAP* is marked Failed rather than waiting forever. |
 

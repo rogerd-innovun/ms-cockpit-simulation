@@ -124,6 +124,34 @@ export interface AuditRow {
   actor: { id: string; name: string } | null;
 }
 
+/** One call to ZEE_API_LOG, as the backend recorded it. */
+export interface SapLogCall {
+  id?: string;
+  timestamp?: string;
+  calledBy?: string | null;
+  api: string;
+  mode: 'mock' | 'live';
+  format: 'json' | 'soap';
+  endpoint: string | null;
+  vbelns: string[];
+  ok: boolean;
+  httpStatus: number | null;
+  durationMs: number;
+  requestBody: string;
+  response: unknown;
+  error: string | null;
+}
+
+export interface SapLogState {
+  api: string;
+  mode: 'off' | 'mock' | 'live';
+  format: 'json' | 'soap';
+  soNumber: string | null;
+  vbeln: string | null;
+  vbelnError: string | null;
+  calls: SapLogCall[];
+}
+
 export interface MappedFailure {
   code: string;
   explanation: string;
@@ -159,6 +187,16 @@ export interface RecordDetail {
   audit: AuditRow[];
   failure: MappedFailure | null;
   duplicates: { recordId: string; correlationId: string; status: POStatus; matchedOn: string }[];
+  /** Other live records holding the identical PDF (FR-3.4). */
+  documentDuplicates?: {
+    recordId: string;
+    correlationId: string;
+    status: POStatus;
+    originalFilename: string;
+    poNumber: string | null;
+  }[];
+  /** FR-7.12 — set while the record is back in review because an approver sent it back. */
+  sentBack?: { reason: string; by: string; at: string } | null;
   allowedTransitions: POStatus[];
   statusLabel: string;
 }

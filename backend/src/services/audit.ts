@@ -10,6 +10,7 @@ import type { Tx } from '../db/client.js';
 export type AuditEventType =
   | 'RECORD_UPLOADED'
   | 'RECORD_PUBLISHED'
+  | 'RECORD_UPDATED'
   | 'RECORD_CANCELLED'
   | 'RECORD_DELETED'
   | 'EXTRACTION_STARTED'
@@ -28,8 +29,10 @@ export type AuditEventType =
   | 'RESULT_INGESTED'
   | 'RESULT_QUARANTINED'
   | 'RESULT_STALE_IGNORED'
+  | 'RESULT_REDELIVERED'
   | 'SLA_TIMEOUT'
   | 'RESUBMITTED'
+  | 'SAP_LOG_API_CALLED'
   | 'STATUS_CHANGED'
   | 'CONFIG_CHANGED';
 

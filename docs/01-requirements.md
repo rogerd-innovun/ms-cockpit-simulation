@@ -104,7 +104,7 @@ Every requirement in this document that creates friction (the review screen, the
 
 | Role | Description | Core permissions |
 |---|---|---|
-| **Uploader / Clerk** | Receives PO PDFs and gets them into the system. | Upload, edit in Draft, publish, edit during review, view own records. |
+| **Uploader** | Receives PO PDFs and gets them into the system. | Upload, edit in Draft, publish, edit during review, view own records. |
 | **Approver** | Accountable for what reaches SAP. | Everything the Uploader can do, plus **Approve** and **Reject**. |
 | **Operations / Support** | Monitors failures and the integration health. | View all records, resubmit failed records, view integration diagnostics, access audit log. |
 | **Administrator** | Configures the system. | Manage vendor profiles, confidence thresholds, folder paths, users and roles. |

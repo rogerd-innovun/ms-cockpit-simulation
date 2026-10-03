@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildOutboundPayload, csvEscape, outboundBaseName } from './csv.js';
+import { OutboundFormatError, buildOutboundPayload, csvEscape, outboundBaseName, type CsvFormat } from './csv.js';
 import type { HeaderWithLines } from '../../domain/validation.js';
 
 const header = (over: Partial<HeaderWithLines> = {}): HeaderWithLines =>
@@ -73,5 +73,61 @@ describe('outbound CSV (FR-9, §8.2)', () => {
     expect(rows).toHaveLength(3);
     expect(rows.every((r) => /^[HL],/.test(r))).toBe(true);
     expect(files[0]!.content).toContain('Line one Line two');
+  });
+});
+
+describe('outbound formats (FR-5.8, FR-9.4)', () => {
+  const iso: CsvFormat = { dateFormat: 'iso', decimalSeparator: '.' };
+  // What the model returns for the sample POs: each vendor writes dates and money its own way.
+  const vendorStyle = () =>
+    header({
+      poDate: 'SEP 17, 2026',
+      requestedDeliveryDate: '24 September 2026',
+      poTotalValue: '1,599.50',
+      currency: ' usd ',
+      lineItems: [
+        {
+          id: 'l1', headerId: 'h1', lineNumber: 1, materialCode: 'MAT-1', customerMaterialNumber: null,
+          description: 'First', quantity: '750', uom: 'EA', unitPrice: '0,42', lineNetValue: '1.234,50',
+          deliveryDate: '18/09/2026', plant: null,
+        },
+      ],
+    });
+  const rows = (fmt: CsvFormat) =>
+    buildOutboundPayload('PO-ABC', 1, vendorStyle(), fmt).files[0]!.content.split('\n').filter((l) => l.trim());
+
+  it('sends one date form and plain decimals whatever the PO wrote', () => {
+    const [h, l] = rows(iso);
+    expect(h).toBe('H,PO-ABC,1,PO-1,2026-09-17,C-1,"Acme, Inc.",Line one Line two,"He said ""hello""",USD,2026-09-24,Net 30,DAP,1599.50');
+    expect(l).toBe('L,PO-ABC,1,1,MAT-1,,First,750,EA,0.42,1234.50,2026-09-18,');
+  });
+
+  it('honours the configured date form', () => {
+    expect(rows({ ...iso, dateFormat: 'yyyymmdd' })[0]).toContain(',20260917,');
+    expect(rows({ ...iso, dateFormat: 'dd.mm.yyyy' })[0]).toContain(',17.09.2026,');
+  });
+
+  it('honours a decimal comma, quoting it so the delimiter stays unambiguous', () => {
+    const [h, l] = rows({ ...iso, decimalSeparator: ',' });
+    expect(h!.endsWith(',"1599,50"')).toBe(true);
+    expect(l).toContain(',"0,42","1234,50",');
+  });
+
+  it('leaves blanks blank', () => {
+    const { files } = buildOutboundPayload('PO-ABC', 1, header({ requestedDeliveryDate: null, poTotalValue: null }), iso);
+    const h = files[0]!.content.split('\n')[0]!;
+    expect(h).toContain(',EUR,,Net 30,DAP,');
+    expect(h.endsWith(',DAP,')).toBe(true);
+  });
+
+  it('refuses to write a date or number it cannot read, rather than passing it through', () => {
+    expect(() => buildOutboundPayload('PO-ABC', 1, header({ poDate: '09/18/2026' }), iso)).toThrow(OutboundFormatError);
+    expect(() =>
+      buildOutboundPayload(
+        'PO-ABC', 1,
+        header({ lineItems: [{ ...header().lineItems[0]!, quantity: 'lots' }] }),
+        iso,
+      ),
+    ).toThrow(/Line 2 quantity/);
   });
 });

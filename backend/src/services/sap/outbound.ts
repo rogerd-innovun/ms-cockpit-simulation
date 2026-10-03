@@ -51,13 +51,20 @@ export async function writeOutboundFiles(
   await fs.mkdir(env.paths.staging, { recursive: true });
   await fs.mkdir(env.paths.outbound, { recursive: true });
 
-  const filenames: string[] = [];
-  const paths: string[] = [];
-  let byteSize = 0;
-  const combined: string[] = [];
+  // Under the rename convention a file is visible to SAP the instant it is renamed in, and
+  // there is no marker to say the set is complete. A header/lines pair therefore has to go
+  // in with the file SAP triggers on — the header, first in the payload — last, so that
+  // when it appears the lines are already there. Under the done-marker convention the
+  // marker is the signal and the order of the data files does not matter.
+  const writeOrder =
+    env.COMPLETENESS_CONVENTION === 'rename' ? [...payload.files].reverse() : payload.files;
+
+  const writtenPaths: string[] = [];
+  const written = new Map<string, { filename: string; path: string }>();
+  const extraFilenames: string[] = [];
 
   try {
-    for (const file of payload.files) {
+    for (const file of writeOrder) {
       const filename = `${base}${file.suffix}`;
       const finalPath = path.join(env.paths.outbound, filename);
 
@@ -69,22 +76,20 @@ export async function writeOutboundFiles(
         await writeFileDurably(finalPath, file.content);
       }
 
-      filenames.push(filename);
-      paths.push(finalPath);
-      byteSize += Buffer.byteLength(file.content, 'utf8');
-      combined.push(file.content);
+      writtenPaths.push(finalPath);
+      written.set(file.suffix, { filename, path: finalPath });
     }
 
     if (env.COMPLETENESS_CONVENTION === 'done_marker') {
       // Written last, after every data file is durable — it is the signal to proceed.
       const markerPath = path.join(env.paths.outbound, `${base}.done`);
       await writeFileDurably(markerPath, '');
-      filenames.push(`${base}.done`);
+      extraFilenames.push(`${base}.done`);
     }
   } catch (err) {
     // FR-9.10 — leave no partial artefacts behind for the SAP job to trip over.
     await Promise.allSettled([
-      ...paths.map((p) => fs.rm(p, { force: true })),
+      ...writtenPaths.map((p) => fs.rm(p, { force: true })),
       ...payload.files.map((f) =>
         fs.rm(path.join(env.paths.staging, `${base}${f.suffix}`), { force: true }),
       ),
@@ -92,7 +97,15 @@ export async function writeOutboundFiles(
     throw err;
   }
 
-  return { filenames, paths, byteSize, checksum: sha256(combined.join('\n')) };
+  // Reported in the payload's own order (header first), whatever order they were written in:
+  // the first path is what the submission row records as the outbound file.
+  const inPayloadOrder = payload.files.map((f) => ({ ...written.get(f.suffix)!, content: f.content }));
+  return {
+    filenames: [...inPayloadOrder.map((w) => w.filename), ...extraFilenames],
+    paths: inPayloadOrder.map((w) => w.path),
+    byteSize: inPayloadOrder.reduce((n, w) => n + Buffer.byteLength(w.content, 'utf8'), 0),
+    checksum: sha256(inPayloadOrder.map((w) => w.content).join('\n')),
+  };
 }
 
 /**

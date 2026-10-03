@@ -8,6 +8,8 @@ import { LineItemsTable } from '../components/LineItemsTable';
 import { PdfPane } from '../components/PdfPane';
 import { StatusBadge } from '../components/StatusBadge';
 import { LifecycleRail } from '../components/LifecycleRail';
+import { SapLogPanel } from '../components/SapLogPanel';
+import { statusLabel } from '../lib/status';
 import type { FieldProvenance, RecordDetail } from '../lib/types';
 
 const HEADER_LAYOUT: { key: string; label: string; full?: boolean }[] = [
@@ -38,6 +40,7 @@ export function RecordPage() {
   const [showOverride, setShowOverride] = useState(false);
   const [cursor, setCursor] = useState(-1);
   const [showKeys, setShowKeys] = useState(false);
+  const [showAllIssues, setShowAllIssues] = useState(false);
   const [split, setSplit] = useState(42);
   const splitRef = useRef<HTMLDivElement>(null);
 
@@ -171,6 +174,11 @@ export function RecordPage() {
   const blocking = d.validation.issues.filter((i) => i.severity === 'BLOCKING');
   const warnings = d.validation.issues.filter((i) => i.severity === 'WARNING');
   const busy = mutate.isPending;
+  const unaccepted = warnings.filter((w) => !w.acknowledged);
+  // Blocking issues first, then warnings; ten rows unless asked for the rest. A warning has
+  // to be accepted before approval, so none may be hidden out of reach.
+  const issueRows = [...blocking, ...warnings];
+  const visibleIssues = showAllIssues ? issueRows : issueRows.slice(0, 10);
 
   const headerField = (f: { key: string; label: string }) => (
     <Field
@@ -313,15 +321,27 @@ export function RecordPage() {
                 <div className="spacer" />
                 <span className="cap">
                   {blocking.length} blocking · {warnings.length} warning
-                  {warnings.length === 1 ? '' : 's'} · {lowCount} below {Math.round(threshold * 100)}%
+                  {warnings.length === 1 ? '' : 's'}
+                  {unaccepted.length > 0 && ` (${unaccepted.length} to accept)`} · {lowCount} below{' '}
+                  {Math.round(threshold * 100)}%
                 </span>
+                {editable && unaccepted.length > 1 && (
+                  <button
+                    className="sm"
+                    disabled={busy}
+                    title="Accept every warning below, after checking each against the PDF"
+                    onClick={() => mutate.mutate(() => api.acknowledgeAll(id))}
+                  >
+                    Accept all {unaccepted.length}
+                  </button>
+                )}
               </div>
 
               {d.extractionQuality && <QualityStrip q={d.extractionQuality} threshold={threshold} />}
 
               {d.validation.issues.length > 0 && (
                 <ul className="issues">
-                  {[...blocking, ...warnings].slice(0, 10).map((i) => (
+                  {visibleIssues.map((i) => (
                     <li
                       key={`${i.code}-${i.fieldPath}`}
                       className={`${i.severity === 'BLOCKING' ? 't-crit' : 't-warn'} ${i.acknowledged ? 'done' : ''}`}
@@ -341,6 +361,13 @@ export function RecordPage() {
                       {i.acknowledged && <span className="cap">accepted</span>}
                     </li>
                   ))}
+                  {issueRows.length > 10 && (
+                    <li>
+                      <button className="quiet sm" onClick={() => setShowAllIssues((s) => !s)}>
+                        {showAllIssues ? 'Show fewer' : `Show all ${issueRows.length}`}
+                      </button>
+                    </li>
+                  )}
                 </ul>
               )}
 
@@ -364,6 +391,8 @@ export function RecordPage() {
               onAdd={() => mutate.mutate(() => api.addLine(id))}
               onDelete={(lineNumber) => mutate.mutate(() => api.deleteLine(id, lineNumber))}
             />
+
+            {r.status === 'SO_CREATED' && <SapLogPanel recordId={r.id} />}
 
             <History d={d} />
           </div>
@@ -463,6 +492,7 @@ function Actions({
   const r = d.record;
   const id = r.id;
   const blocked = d.validation.blockingCount > 0;
+  const toAccept = d.validation.issues.filter((i) => i.severity === 'WARNING' && !i.acknowledged).length;
 
   return (
     <div className="actions">
@@ -488,10 +518,17 @@ function Actions({
 
       {r.status === 'NEEDS_REVIEW' && (
         <>
-          <button className="quiet" disabled={busy} onClick={onReject}>Send back</button>
+          <button
+            className="quiet"
+            disabled={busy || !canApprove}
+            title={canApprove ? undefined : 'Your role cannot send records back.'}
+            onClick={onReject}
+          >
+            Send back
+          </button>
           <button
             className="primary"
-            disabled={busy || blocked || !canApprove || isOwnUpload}
+            disabled={busy || blocked || toAccept > 0 || !canApprove || isOwnUpload}
             title={
               !canApprove
                 ? 'Your role cannot approve records.'
@@ -499,7 +536,9 @@ function Actions({
                   ? 'Segregation of duties: this record must be approved by someone else.'
                   : blocked
                     ? `${d.validation.blockingCount} blocking issue(s) must be fixed first.`
-                    : 'Approve and send to SAP'
+                    : toAccept > 0
+                      ? `${toAccept} warning(s) must be accepted first — check each against the PDF.`
+                      : 'Approve and send to SAP'
             }
             onClick={() => onAction(() => api.approve(id))}
           >
@@ -523,17 +562,56 @@ function Actions({
 
 function Notices({ d }: { d: RecordDetail }) {
   const r = d.record;
+  // Defence in depth: a response that omits `duplicates` used to throw here and
+  // take the whole page white. The server now sends one shape from every route
+  // (detailResponse), and this keeps the worst case a missing notice.
+  const dups = d.duplicates ?? [];
+  // The same PDF, uploaded before. Only worth a warning while there is still something to
+  // decide — once the order is with SAP the question has been answered.
+  const docDups = ['DRAFT', 'PUBLISHED', 'PROCESSING', 'NEEDS_REVIEW', 'EXTRACTION_FAILED'].includes(r.status)
+    ? (d.documentDuplicates ?? [])
+    : [];
+  const docDupAtSap = docDups.some((x) => x.status === 'SENT_TO_SAP' || x.status === 'SO_CREATED');
   const any =
     r.status === 'SO_CREATED' ||
     (r.status === 'FAILED' && d.failure) ||
     r.status === 'EXTRACTION_FAILED' ||
     r.status === 'SENT_TO_SAP' ||
-    d.duplicates.length > 0 ||
+    dups.length > 0 ||
+    docDups.length > 0 ||
+    d.sentBack ||
     (r.status === 'NEEDS_REVIEW' && (r.currentAttempt > 0 || r.failureCode));
   if (!any) return null;
 
   return (
     <div className="notice-stack">
+      {docDups.length > 0 && (
+        <div className={`notice ${docDupAtSap ? 't-crit' : 't-warn'}`}>
+          <b>
+            This exact PDF is already in the system
+            {docDupAtSap ? ' — and has reached SAP' : ''}
+          </b>
+          <span>
+            {docDups.map((dup) => (
+              <Link key={dup.recordId} to={`/records/${dup.recordId}`} style={{ marginRight: 12 }}>
+                {dup.poNumber ?? dup.originalFilename} · {statusLabel(dup.status)}
+              </Link>
+            ))}
+          </span>
+          <span>
+            {docDupAtSap
+              ? 'Publishing it again will ask for a reason, which goes in the audit trail.'
+              : 'Publishing is allowed. Check this is not the same order entered twice.'}
+          </span>
+        </div>
+      )}
+      {r.status === 'NEEDS_REVIEW' && d.sentBack && (
+        <div className="notice t-warn">
+          <b>Sent back by {d.sentBack.by}</b>
+          <span>{d.sentBack.reason}</span>
+          <span className="raw">{new Date(d.sentBack.at).toLocaleString()}</span>
+        </div>
+      )}
       {r.status === 'SO_CREATED' && (
         <div className="notice t-ok">
           <b>Sales Order {r.soNumber} created in SAP</b>
@@ -560,12 +638,12 @@ function Notices({ d }: { d: RecordDetail }) {
           <span>The order file is in the drop folder. This page updates itself when a result comes back.</span>
         </div>
       )}
-      {d.duplicates.length > 0 && (
+      {dups.length > 0 && (
         <div className="notice t-warn">
           <b>Possible duplicate</b>
           <span>
-            {d.duplicates.length} other record{d.duplicates.length === 1 ? '' : 's'} share this PO number and customer:{' '}
-            {d.duplicates.map((dup) => (
+            {dups.length} other record{dups.length === 1 ? '' : 's'} share this PO number and customer:{' '}
+            {dups.map((dup) => (
               <Link key={dup.recordId} to={`/records/${dup.recordId}`} style={{ marginRight: 8 }}>
                 {dup.correlationId.slice(0, 11)}… ({dup.status})
               </Link>

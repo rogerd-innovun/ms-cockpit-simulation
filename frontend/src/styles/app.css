@@ -548,6 +548,20 @@ button.restore:hover:not(:disabled) { color: var(--mark); border-bottom-color: v
 .notice .raw { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); }
 .notice-stack { display: flex; flex-direction: column; gap: 2px; margin-top: 16px; }
 
+/* ZEE_API_LOG — what was sent and what SAP answered, verbatim. */
+.sap-log pre {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--wash);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
 /* ----------------------------------------------------------------- quality --- */
 /* One line stating how much to trust the read: who read it, the certainty meter
    with the threshold tick, and the counts. Toned like everything else. */

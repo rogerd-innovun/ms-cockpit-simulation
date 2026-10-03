@@ -1,6 +1,8 @@
 import type { POStatus, Prisma, Role, User } from '@prisma/client';
 import { env } from '../config/env.js';
 import { prisma } from '../db/client.js';
+import { markAcknowledged } from '../domain/acknowledgement.js';
+import { deriveSentBack } from '../domain/sentBack.js';
 import { assertTransition, isEditable } from '../domain/status.js';
 import {
   HEADER_FIELDS,
@@ -110,13 +112,18 @@ export async function findDuplicates(contentHash: string, excludeRecordId: strin
       recordId: { not: excludeRecordId },
       record: { deletedAt: null, status: { not: 'CANCELLED' } },
     },
-    include: { record: { select: { id: true, correlationId: true, status: true } } },
+    include: {
+      record: {
+        select: { id: true, correlationId: true, status: true, header: { select: { poNumber: true } } },
+      },
+    },
   });
   return docs.map((d) => ({
     recordId: d.record.id,
     correlationId: d.record.correlationId,
     status: d.record.status,
     originalFilename: d.originalFilename,
+    poNumber: d.record.header?.poNumber ?? null,
     matchedOn: 'FILE_HASH' as const,
   }));
 }
@@ -162,10 +169,22 @@ export async function publishRecord(actor: Actor, recordId: string, overrideReas
     // FR-3.4 — block only where a duplicate already reached SAP; otherwise warn and
     // require the user to say why they are proceeding.
     if ((env.DUPLICATE_POLICY === 'block' || submitted.length > 0) && !overrideReason) {
+      // Name them: "identical to 2 existing records" leaves the person hunting for which.
+      const named =
+        duplicates
+          .slice(0, 3)
+          .map((d) => `${d.correlationId} (${d.status})`)
+          .join(', ') + (duplicates.length > 3 ? `, and ${duplicates.length - 3} more` : '');
       throw conflict(
-        `This PDF is identical to ${duplicates.length} existing record(s)${
-          submitted.length > 0 ? ', one of which has already been sent to SAP' : ''
-        }. Provide an override reason to publish it anyway.`,
+        `This PDF is identical to ${
+          duplicates.length === 1 ? 'an existing record' : `${duplicates.length} existing records`
+        }: ${named}.${
+          submitted.length === 0
+            ? ''
+            : duplicates.length === 1
+              ? ' It has already reached SAP.'
+              : ' At least one has already reached SAP.'
+        } Provide an override reason to publish it anyway.`,
         'DUPLICATE_DOCUMENT',
         { duplicates },
       );
@@ -194,6 +213,49 @@ export async function publishRecord(actor: Actor, recordId: string, overrideReas
   });
 
   return updated;
+}
+
+/**
+ * FR-2.1 — a draft's vendor hint and notes. Only the fields in `patch` change: leaving a
+ * key out means "leave it alone", not "clear it". Empty text clears, as at upload.
+ */
+export async function updateRecordMetadata(
+  actor: Actor,
+  recordId: string,
+  patch: { vendorHint?: string | null; notes?: string | null },
+) {
+  const record = await getRecordOrThrow(recordId);
+  if (record.status !== 'DRAFT') {
+    throw badRequest('Metadata can only be changed while the record is in Draft.', 'NOT_EDITABLE');
+  }
+
+  const data: { vendorHint?: string | null; notes?: string | null } = {};
+  const changes: string[] = [];
+  const before: Record<string, string | null> = {};
+  const after: Record<string, string | null> = {};
+  for (const key of ['vendorHint', 'notes'] as const) {
+    if (!(key in patch)) continue;
+    const next = patch[key]?.trim() || null;
+    if (next === record[key]) continue;
+    data[key] = next;
+    before[key] = record[key];
+    after[key] = next;
+    changes.push(`${key}: "${record[key] ?? ''}" → "${next ?? ''}"`);
+  }
+
+  if (changes.length > 0) {
+    await prisma.pORecord.update({ where: { id: recordId }, data });
+    // FR-13.1 — this steers which vendor profile the extraction uses, so it is audited.
+    await writeAudit({
+      recordId,
+      eventType: 'RECORD_UPDATED',
+      message: changes.join('; '),
+      before: before as Prisma.InputJsonValue,
+      after: after as Prisma.InputJsonValue,
+      actorId: actor.id,
+    });
+  }
+  return getRecordDetail(recordId);
 }
 
 // ------------------------------------------------------- FR-7 review editing
@@ -333,24 +395,69 @@ export async function deleteLine(actor: Actor, recordId: string, lineNumber: num
   return getRecordDetail(recordId);
 }
 
-/** FR-6.9 */
-export async function acknowledgeWarning(
+/** The acceptances on a record, in the shape markAcknowledged wants. */
+async function loadAcknowledgements(recordId: string) {
+  const [acks, audit] = await Promise.all([
+    prisma.validationAck.findMany({
+      where: { recordId },
+      include: { acknowledgedBy: { select: { name: true } } },
+    }),
+    prisma.auditEvent.findMany({
+      where: { recordId, eventType: 'WARNING_ACKNOWLEDGED' },
+      orderBy: { timestamp: 'asc' },
+    }),
+  ]);
+  return { acks, audit };
+}
+
+/**
+ * FR-6.9 — accept one warning, or every warning currently raised. What is recorded is the
+ * warning as it reads now (computed here, never taken from the client), because that is
+ * what the person looked at; see markAcknowledged for why the wording matters.
+ */
+export async function acknowledgeWarnings(
   actor: Actor,
   recordId: string,
-  code: string,
-  fieldPath: string,
+  target: { code: string; fieldPath: string } | 'all',
 ) {
-  await prisma.validationAck.upsert({
-    where: { recordId_code_fieldPath: { recordId, code, fieldPath } },
-    create: { recordId, code, fieldPath, acknowledgedById: actor.id },
-    update: { acknowledgedById: actor.id, acknowledgedAt: new Date() },
-  });
-  await writeAudit({
-    recordId,
-    eventType: 'WARNING_ACKNOWLEDGED',
-    message: `Accepted warning ${code} on ${fieldPath}`,
-    actorId: actor.id,
-  });
+  const record = await getRecordOrThrow(recordId);
+  // Accepting is part of reviewing; on an approved or cancelled record it means nothing.
+  if (!isEditable(record.status)) {
+    throw conflict(`Warnings can only be accepted during review (this record is ${record.status}).`, 'NOT_EDITABLE');
+  }
+
+  const issues = await validateRecord(record.header);
+  const { acks, audit } = await loadAcknowledgements(recordId);
+  const current = markAcknowledged(issues, acks, audit);
+
+  let chosen = current.filter((i) => i.severity === 'WARNING');
+  if (target !== 'all') {
+    chosen = chosen.filter((i) => i.code === target.code && i.fieldPath === target.fieldPath);
+    if (chosen.length === 0) {
+      if (issues.some((i) => i.severity === 'BLOCKING' && i.code === target.code && i.fieldPath === target.fieldPath)) {
+        throw badRequest('That is a blocking issue. It has to be fixed, not accepted.', 'NOT_A_WARNING');
+      }
+      throw conflict(
+        'That warning is not raised on this record any more — it was probably fixed. Reload to see the current list.',
+        'WARNING_NOT_RAISED',
+      );
+    }
+  }
+
+  for (const w of chosen.filter((i) => !i.acknowledged)) {
+    await prisma.validationAck.upsert({
+      where: { recordId_code_fieldPath: { recordId, code: w.code, fieldPath: w.fieldPath } },
+      create: { recordId, code: w.code, fieldPath: w.fieldPath, acknowledgedById: actor.id },
+      update: { acknowledgedById: actor.id, acknowledgedAt: new Date() },
+    });
+    await writeAudit({
+      recordId,
+      eventType: 'WARNING_ACKNOWLEDGED',
+      message: `Accepted warning ${w.code} on ${w.fieldPath}: ${w.message}`,
+      after: { code: w.code, fieldPath: w.fieldPath, message: w.message },
+      actorId: actor.id,
+    });
+  }
   return getRecordDetail(recordId);
 }
 
@@ -385,6 +492,20 @@ export async function approveRecord(actor: Actor, recordId: string) {
     );
   }
 
+  // FR-6.1 — a warning does not block, but a person has to have accepted it. Without this
+  // the review screen's warnings were decoration: a wrong grand total sat flagged on the
+  // screen and went to SAP all the same.
+  const { acks, audit: ackAudit } = await loadAcknowledgements(recordId);
+  const warnings = markAcknowledged(issues, acks, ackAudit).filter((i) => i.severity === 'WARNING');
+  const unaccepted = warnings.filter((w) => !w.acknowledged);
+  if (unaccepted.length > 0) {
+    throw badRequest(
+      `Cannot approve: ${unaccepted.length} warning(s) have not been accepted. Check each against the PDF, then accept it or correct the value.`,
+      'WARNINGS_UNACKNOWLEDGED',
+      { issues: unaccepted },
+    );
+  }
+
   const attempt = record.currentAttempt + 1;
   // FR-7.10 / DM-03 — snapshot exactly what was approved, immutably.
   const snapshot = {
@@ -399,25 +520,47 @@ export async function approveRecord(actor: Actor, recordId: string) {
       })),
     approvedAt: new Date().toISOString(),
     approvedBy: { id: actor.id, name: actor.name },
+    // FR-6.9 — which warnings stood when this was approved, who accepted each, and when.
+    acceptedWarnings: warnings.map((w) => {
+      const ack = acks.find((a) => a.code === w.code && a.fieldPath === w.fieldPath);
+      return {
+        code: w.code,
+        fieldPath: w.fieldPath,
+        message: w.message,
+        acceptedBy: ack?.acknowledgedBy.name ?? null,
+        acceptedAt: ack?.acknowledgedAt.toISOString() ?? null,
+      };
+    }),
   };
 
   await prisma.$transaction(async (tx) => {
-    await tx.submission.create({
-      data: {
-        recordId,
-        attempt,
-        approvedById: actor.id,
-        approvedSnapshot: snapshot as Prisma.InputJsonValue,
-      },
-    });
-    await tx.pORecord.update({
-      where: { id: recordId },
+    // Claim the record first, and only if it is still exactly as this request found it.
+    // Two approvals at once both pass the checks above; the conditional update is what
+    // lets one through, because the second waits on the first's row lock and then finds
+    // the status already changed. Without it the loser got a unique-constraint error on
+    // the submission and the user a 500, when the right answer is "already approved".
+    const claimed = await tx.pORecord.updateMany({
+      where: { id: recordId, status: record.status, currentAttempt: record.currentAttempt },
       data: {
         status: 'APPROVED',
         currentAttempt: attempt,
         statusChangedAt: new Date(),
         failureCode: null,
         failureMessage: null,
+      },
+    });
+    if (claimed.count !== 1) {
+      throw conflict(
+        'This record was approved or changed by someone else a moment ago. Reload to see where it stands.',
+        'CONCURRENT_UPDATE',
+      );
+    }
+    await tx.submission.create({
+      data: {
+        recordId,
+        attempt,
+        approvedById: actor.id,
+        approvedSnapshot: snapshot as Prisma.InputJsonValue,
       },
     });
   });
@@ -447,6 +590,11 @@ export async function approveRecord(actor: Actor, recordId: string) {
 
 /** FR-7.12 */
 export async function rejectRecord(actor: Actor, recordId: string, reason: string) {
+  // FR-7.12 — sending a record back is an Approver action, enforced here and not only by
+  // hiding the button: the uploader is the one person this check exists to stop.
+  if (!canApprove(actor.role)) {
+    throw forbidden('Your role cannot send records back.', 'NOT_AN_APPROVER');
+  }
   if (!reason?.trim()) throw badRequest('A rejection reason is required.', 'REASON_REQUIRED');
   const record = await getRecordOrThrow(recordId);
   if (record.status !== 'NEEDS_REVIEW') {
@@ -458,9 +606,11 @@ export async function rejectRecord(actor: Actor, recordId: string, reason: strin
     message: reason.trim(),
     actorId: actor.id,
   });
+  // The reason is in the audit trail and is read back from there (deriveSentBack). It used
+  // to be written over `notes` as well, which destroyed whatever the uploader had put there.
   await prisma.pORecord.update({
     where: { id: recordId },
-    data: { notes: reason.trim(), statusChangedAt: new Date() },
+    data: { statusChangedAt: new Date() },
   });
   return getRecordDetail(recordId);
 }
@@ -611,7 +761,6 @@ export async function getRecordDetail(recordId: string) {
   ]);
 
   const issues = await validateRecord(record.header);
-  const acknowledged = new Set(acks.map((a) => `${a.code}::${a.fieldPath}`));
 
   /**
    * FR-7.2 / NFR-5.2 — the read, summarised so a reviewer can see at a glance how
@@ -652,16 +801,14 @@ export async function getRecordDetail(recordId: string) {
     })),
     validation: {
       threshold: env.CONFIDENCE_THRESHOLD,
-      issues: issues.map((i) => ({
-        ...i,
-        acknowledged: acknowledged.has(`${i.code}::${i.fieldPath}`),
-      })) as (ValidationIssue & { acknowledged: boolean })[],
+      issues: markAcknowledged(issues, acks, audit),
       blockingCount: blockingIssues(issues).length,
     },
     submissions,
     results,
     audit,
     failure: mapSapError(record.failureCode, record.failureMessage),
+    sentBack: deriveSentBack(record.status, audit),
     permissions: null as null | Record<string, boolean>,
   };
 }
@@ -694,7 +841,10 @@ export async function listRecords(filters: ListFilters) {
   const [rows, total] = await Promise.all([
     prisma.pORecord.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      // Most recently moved first, which is the order the worklist opens in — so the
+      // first page is the one a person wants, and later pages are the quieter records.
+      // `id` breaks ties, so page two never repeats or skips a row that page one showed.
+      orderBy: [{ statusChangedAt: 'desc' }, { id: 'desc' }],
       take: Math.min(filters.take ?? 50, 200),
       skip: filters.skip ?? 0,
       include: {
