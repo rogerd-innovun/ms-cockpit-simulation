@@ -69,7 +69,16 @@ services:
       - key: SAP_SIM_ALLOW_IN_PRODUCTION
         value: "true"
       - key: SAP_SIM_FAILURE_RATE
-        value: "0.15"        # set 0 for a demo where nothing should fail
+        value: "0"           # nothing is rejected; set e.g. 0.15 to exercise the failure path
+
+      # ---- notifications (FR-14) ----
+      # The in-app bell needs nothing. This is the address in the "Open" links of emails and
+      # Teams messages. To switch on email or Teams, add these in the Render dashboard
+      # (Environment), where secrets belong, not in this file: SMTP_HOST, SMTP_PORT, SMTP_USER,
+      # SMTP_PASS, SMTP_FROM, NOTIFY_EMAIL_OVERRIDE_TO (send every email to one address, for
+      # demos) and NOTIFY_TEAMS_WEBHOOK_URL. See DEPLOY.md "Notifications".
+      - key: PUBLIC_BASE_URL
+        value: https://po-cockpit.onrender.com
 
       # Apply pending migrations on boot (start.sh refuses to start if this fails).
       # A boot with nothing pending is a fast no-op; this keeps the Supabase schema

@@ -54,18 +54,21 @@ enum ActorType {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  name         String
-  passwordHash String
-  role         Role
-  createdAt    DateTime @default(now())
+  id                  String   @id @default(uuid())
+  email               String   @unique
+  name                String
+  passwordHash        String
+  role                Role
+  createdAt           DateTime @default(now())
+  /// FR-14 — everything the in-app inbox holds from before this moment counts as read.
+  notificationsSeenAt DateTime @default(now())
 
-  uploadedRecords PORecord[]     @relation("uploader")
-  submissions     Submission[]   @relation("approver")
-  auditEvents     AuditEvent[]
-  edits           FieldExtraction[]
-  acks            ValidationAck[]
+  uploadedRecords   PORecord[]               @relation("uploader")
+  submissions       Submission[]             @relation("approver")
+  auditEvents       AuditEvent[]
+  edits             FieldExtraction[]
+  acks              ValidationAck[]
+  notificationPrefs NotificationPreference[]
 }
 
 /// The central record. FR-1, FR-8.
@@ -100,14 +103,15 @@ model PORecord {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  sourceDocument  SourceDocument?
-  header          POHeader?
-  extractionRuns  ExtractionRun[]
-  fieldExtractions FieldExtraction[]
-  submissions     Submission[]
-  sapResults      SapResult[]
-  auditEvents     AuditEvent[]
-  validationAcks  ValidationAck[]
+  sourceDocument     SourceDocument?
+  header             POHeader?
+  extractionRuns     ExtractionRun[]
+  fieldExtractions   FieldExtraction[]
+  submissions        Submission[]
+  sapResults         SapResult[]
+  auditEvents        AuditEvent[]
+  validationAcks     ValidationAck[]
+  notificationEvents NotificationEvent[]
 
   @@index([status])
   @@index([uploadedById])
@@ -256,9 +260,9 @@ model Submission {
 
   attempt Int
 
-  approvedById String
-  approvedBy   User     @relation("approver", fields: [approvedById], references: [id])
-  approvedAt   DateTime @default(now())
+  approvedById     String
+  approvedBy       User     @relation("approver", fields: [approvedById], references: [id])
+  approvedAt       DateTime @default(now())
   /// FR-7.10, DM-03 — immutable snapshot of exactly what was approved.
   approvedSnapshot Json
 
@@ -279,20 +283,20 @@ model SapResult {
   recordId String?
   record   PORecord? @relation(fields: [recordId], references: [id])
 
-  correlationId  String
-  attempt        Int?
-  outcome        SapOutcome
-  soNumber       String?
-  errorCode      String?
-  errorMessage   String?
-  sapTimestamp   String?
+  correlationId    String
+  attempt          Int?
+  outcome          SapOutcome
+  soNumber         String?
+  errorCode        String?
+  errorMessage     String?
+  sapTimestamp     String?
   /// FR-10.11 — raw file content retained.
-  rawContent     String
-  sourceFilename String     @unique
+  rawContent       String
+  sourceFilename   String     @unique
   /// FR-10.6, FR-10.7 — unmatched/unparseable files are quarantined, never deleted.
-  quarantined    Boolean    @default(false)
+  quarantined      Boolean    @default(false)
   quarantineReason String?
-  ingestedAt     DateTime   @default(now())
+  ingestedAt       DateTime   @default(now())
 
   @@index([correlationId])
 }
@@ -333,4 +337,88 @@ model AuditEvent {
 
   @@index([recordId, timestamp])
   @@index([eventType])
+}
+
+// ---------------------------------------------------------------- FR-14 notifications
+
+/// What a notification is about. The audience of each kind is in services/notifications/kinds.ts.
+enum NotificationKind {
+  /// A record is ready for a person to check (extraction finished, or a rejected order was corrected).
+  REVIEW_NEEDED
+  /// An approver sent the record back to the uploader.
+  SENT_BACK
+  /// SAP rejected the order, or never answered.
+  RECORD_FAILED
+  EXTRACTION_FAILED
+  SO_CREATED
+  /// Something wrong between the cockpit and SAP that no single user caused.
+  INTEGRATION_ALERT
+}
+
+enum DeliveryChannel {
+  EMAIL
+  TEAMS
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+/// One thing that happened that someone should hear about. FR-14.1 to FR-14.3.
+model NotificationEvent {
+  id        String           @id @default(uuid())
+  kind      NotificationKind
+  /// FR-14.5 — names the state change ("REVIEW_NEEDED:<record>:<when it entered the state>"),
+  /// so reporting the same change twice (a retried job, a re-read file) is a no-op, not a
+  /// second notification.
+  dedupeKey String           @unique
+
+  recordId String?
+  record   PORecord? @relation(fields: [recordId], references: [id])
+
+  title  String
+  body   String
+  /// Who it is for: everyone holding one of these roles, and/or the one named user.
+  roles  Role[]
+  userId String?
+
+  createdAt DateTime @default(now())
+
+  deliveries NotificationDelivery[]
+
+  @@index([createdAt])
+}
+
+/// An email or a Teams message still to be sent, being sent, or sent. The database is the
+/// queue (D-1): a mail server that is slow or down delays this, never extraction or SAP.
+model NotificationDelivery {
+  id      String            @id @default(uuid())
+  eventId String
+  event   NotificationEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  channel   DeliveryChannel
+  /// An email address, or "teams" for the shared channel.
+  recipient String
+
+  status        DeliveryStatus @default(PENDING)
+  attempts      Int            @default(0)
+  nextAttemptAt DateTime       @default(now())
+  lastError     String?
+  sentAt        DateTime?
+
+  @@unique([eventId, channel, recipient])
+  @@index([status, nextAttemptAt])
+}
+
+/// FR-14.4 — which notifications a user receives, and where. No row means the defaults (all on).
+model NotificationPreference {
+  userId String
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind   NotificationKind
+  inApp  Boolean          @default(true)
+  email  Boolean          @default(true)
+
+  @@id([userId, kind])
 }

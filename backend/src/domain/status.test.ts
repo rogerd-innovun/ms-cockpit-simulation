@@ -52,9 +52,17 @@ describe('status machine (docs/01-requirements.md §5)', () => {
   });
 
   it('a failed order can be corrected but never auto-retried into SAP', () => {
-    expect(TRANSITIONS.FAILED).toEqual(['NEEDS_REVIEW']);
+    expect(TRANSITIONS.FAILED).toContain('NEEDS_REVIEW');
     expect(TRANSITIONS.FAILED).not.toContain('SENT_TO_SAP');
     expect(TRANSITIONS.FAILED).not.toContain('APPROVED');
+  });
+
+  it('a failed order can end as SO_CREATED, which only SAP answering late can cause', () => {
+    // Declared so the watcher can record SAP's late "created"; nothing else in the code
+    // asks for this transition (the UI offers no action for it).
+    expect(TRANSITIONS.FAILED).toEqual(['NEEDS_REVIEW', 'SO_CREATED']);
+    // Terminal still means terminal: nothing leaves SO_CREATED.
+    expect(TRANSITIONS.SO_CREATED).toEqual([]);
   });
 
   it('INV-05: values are only editable in NEEDS_REVIEW and EXTRACTION_FAILED', () => {

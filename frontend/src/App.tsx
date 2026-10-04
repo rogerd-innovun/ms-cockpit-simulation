@@ -1,9 +1,12 @@
-import { Link, Navigate, Route, Routes } from 'react-router-dom';
+import { Link, NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from './lib/auth';
 import { api } from './lib/api';
 import { useTheme } from './lib/theme';
+import { NotificationBell } from './components/NotificationBell';
+import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
+import { NotificationsPage } from './pages/NotificationsPage';
 import { WorklistPage } from './pages/WorklistPage';
 import { RecordPage } from './pages/RecordPage';
 
@@ -20,8 +23,13 @@ export default function App() {
           <span className="brand-name">PO-to-SO Cockpit</span>
           <span className="brand-sub">S/4HANA</span>
         </Link>
+        <nav className="nav" aria-label="Main">
+          <NavLink to="/" end>Worklist</NavLink>
+          <NavLink to="/dashboard">Dashboard</NavLink>
+        </nav>
         <div className="spacer" />
         <Health />
+        <NotificationBell />
         <ThemeToggle />
         <span className="who">
           <b>{user.name}</b>
@@ -33,6 +41,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<WorklistPage />} />
           <Route path="/records/:id" element={<RecordPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

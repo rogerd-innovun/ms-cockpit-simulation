@@ -1,4 +1,5 @@
 import { Field } from './Field';
+import { parseDecimal } from '../lib/decimal';
 import type { FieldProvenance, LineItem, ValidationIssue } from '../lib/types';
 
 const COLUMNS: { key: keyof LineItem; label: string; width?: string; num?: boolean }[] = [
@@ -36,10 +37,9 @@ export function LineItemsTable({
   onDelete,
 }: Props) {
   // A reviewer's first instinct is to check the lines add up to the PO total.
-  const netSum = lines.reduce((sum, l) => {
-    const n = Number.parseFloat((l.lineNetValue ?? '').replace(/[^0-9.-]/g, ''));
-    return Number.isFinite(n) ? sum + n : sum;
-  }, 0);
+  // Read the way the validator reads them: the values are kept as the vendor wrote them,
+  // so "1 260,00" is 1260, not 126000.
+  const netSum = lines.reduce((sum, l) => sum + (parseDecimal(l.lineNetValue) ?? 0), 0);
 
   const flagged = (path: string) =>
     issues.some((i) => i.fieldPath === path && (i.severity === 'BLOCKING' || !i.acknowledged)) ||

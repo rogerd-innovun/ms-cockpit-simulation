@@ -197,7 +197,7 @@ Implemented in `backend/prisma/schema.prisma`, following §7 of the requirements
 | `POST` | `/api/auth/login` · `GET /api/auth/me` | NFR-3.1 |
 | `GET` | `/api/health` | NFR-5.1 |
 | `GET` | `/api/records` · `/api/records/counts` | FR-12.1–12.4 |
-| `POST` | `/api/records` (multipart) | FR-1 |
+| `POST` | `/api/records` (multipart, one file) | FR-1 |
 | `GET` | `/api/records/:id` | FR-12.5 |
 | `GET` | `/api/records/:id/document` | FR-1.9, NFR-3.5 |
 | `PATCH` | `/api/records/:id` | FR-2.1 |
@@ -210,16 +210,32 @@ Implemented in `backend/prisma/schema.prisma`, following §7 of the requirements
 | `POST` | `/api/records/:id/retry-extraction` · `/manual-entry` | FR-4.12, FR-5.7 |
 | `POST` | `/api/records/:id/cancel` · `DELETE /api/records/:id` | FR-2.3, T-14 |
 | `GET` `POST` | `/api/records/:id/sap-log` | D-9 — ZEE_API_LOG state / call it for the record's SO |
+| `GET` | `/api/dashboard?days=7\|30\|90\|0` | FR-16 |
+| `GET` `POST` | `/api/notifications` · `/read` | FR-14 — the in-app inbox, and "mark all read" |
+| `GET` `PUT` | `/api/notifications/preferences` | FR-14.4 |
+| `GET` `POST` | `/api/notifications/channels` · `/test` | FR-14.8 — channel status (booleans and counts only) / admin test |
 
 Errors return `{ error: { code, message, details } }`. `code` is stable for the UI; `message` names the field and the remedy (NFR-4.3). An unexpected error is the exception: its message is only a reference number, and the cause is in the server log under that reference.
 
-Beyond the record itself, every record-detail response carries three things the screens depend on: `duplicates` (same PO number and customer, FR-3.5), `documentDuplicates` (the identical PDF, FR-3.4 — listed on the draft so the warning comes before Publish, not only after it is refused) and `sentBack` (the reason an approver returned the record, read back from the audit trail while it is in review and clear once it is approved again, FR-7.12). `PATCH /api/records/:id` changes only the fields in the body and audits each change.
+Beyond the record itself, every record-detail response carries four things the screens depend on: `duplicates` (same PO number and customer, FR-3.5), `documentDuplicates` (the identical PDF, FR-3.4 — listed on the draft so the warning comes before Publish, not only after it is refused) and `sentBack` (the reason an approver returned the record, read back from the audit trail while it is in review and clear once it is approved again, FR-7.12) and `unlinkedOrders` (Sales Orders SAP reported creating that the record is not linked to, FR-10.13). `PATCH /api/records/:id` changes only the fields in the body and audits each change.
+
+### 6.1 Notifications and the dashboard
+
+**Notifications (FR-14).** Something that happened — a record entering review, a SAP answer, an unwritable drop folder — becomes one `NotificationEvent`, keyed by what it was about and *when the record entered that state* (`REVIEW_NEEDED:<record>:<timestamp>`). The key is unique, so reporting the same change twice (a retried job, a re-read result file) is a recognised no-op, which is how FR-14.5 is met without any "have I sent this?" bookkeeping. A resubmission enters the state at a new time and is therefore a new event, as it should be.
+
+An event names its audience by role and, for the kinds that are theirs (`SENT_BACK`, `SO_CREATED`, failures), the uploader. The in-app inbox is simply the events a user's role or id matches, minus the kinds they muted, with "new" meaning newer than the moment they last pressed *Mark all read* — so there is no per-user, per-event row to write. Email and Teams go through `NotificationDelivery` rows (the database is the queue, D-1): created in the same transaction as the event, sent by a worker loop that leases each row, retries with growing pauses and gives up after `NOTIFY_MAX_ATTEMPTS`. Teams is one shared channel, so it gets one message per event, not one per person.
+
+`notify()` never throws, and is called after the change it announces has been committed. A mail server being down must not look like a failed extraction (which would re-run it) or undo an approval. Secrets — the SMTP password and the Teams URL, which is a credential — appear in no log line, no error message and no API response.
+
+**Dashboard (FR-16).** Computed on request by `domain/dashboard.ts` from plain data, so every figure is unit-tested without a database. It follows the POs *uploaded in the period* to wherever they got to, so one period governs every figure. The straight-through rate counts approved POs with no field edit, line added or line removed; the minutes figure is the one assumption, and is configured, labelled and explained on the page. It reads the whole cohort into memory, which is fine for the thousands of POs a PoC holds and would want a materialised summary beyond that.
+
+**Several files at once (FR-1.7)** is done by the browser, not by a batch endpoint: for each file it calls `POST /api/records` and then `POST /api/records/:id/publish`, three files at a time, up to 50 per drop (`frontend/src/lib/batchUpload.ts`). A bulk endpoint would have needed its own partial-failure contract and one large request; this way every record goes through exactly the checks, audit events and size limit a single upload does, and one bad file cannot take the rest down. A file identical to one already in the system is left as a `DRAFT` rather than published, and two identical files in the same drop are sent once, since two simultaneous uploads of the same bytes would otherwise both slip past the duplicate check. Extraction then works through the queue one record at a time, oldest first (about 12 seconds each with `gemini-3.6-flash`), so a drop of twenty is being read for around four minutes.
 
 ---
 
 ## 7. What the tests cover
 
-`npm test` — unit tests on the parts where a silent error becomes a wrong Sales Order:
+`npm test` — unit tests on the parts where a silent error becomes a wrong Sales Order (and, for the browser's multi-file upload, on what it sends):
 
 - **`status.test.ts`** — every undeclared transition is rejected; terminal states are terminal; nothing reaches `SENT_TO_SAP` except from `APPROVED`; `FAILED` can never transition straight back to SAP.
 - **`ids.test.ts`** — correlation IDs are filename-safe, unique, and independent of the vendor PO number.
@@ -232,6 +248,11 @@ Beyond the record itself, every record-detail response carries three things the 
 - **`outbound.test.ts`** — the header file of a pair is written last under the rename convention, the done-marker last under the other, and a failed write leaves nothing behind.
 - **`records.metadata.test.ts`**, **`sentBack.test.ts`** — a metadata update touches only what it was sent and is audited; a send-back never overwrites the uploader's notes, and its reason surfaces until the record is approved again; a blocked duplicate publish names the records it matched.
 - **`error.test.ts`**, **`query.test.ts`** — an unexpected error reaches the client as a reference number and nothing else; malformed JSON, unique-constraint races and bad worklist parameters get the right 4xx.
+- **`resultWatcher.late.test.ts`**, **`unlinkedOrders.test.ts`** — an answer that arrives after the SLA timeout completes the record (or replaces the timeout with SAP's reason), claimed with a conditional update so a resubmission a moment earlier wins; answers that cannot be applied are still stored and name the Sales Order; the orders a record is not linked to are found, ignoring quarantined files and zero-padding.
+- **`dashboard.test.ts`**, **`format.test.ts`** — the dashboard's arithmetic: straight-through rate, the minutes-saved formula and its floor at zero, what counts as "caught", rejections by code and how many recovered, field accuracy, median turnaround, and the day-by-day buckets.
+- **`notifications/*.test.ts`** — who each kind is for; the exact email and Teams card that go out; one event per state change; who is emailed, honouring each person's settings and the Teams filter; the outbox's lease, backoff and give-up; the inbox's "new" count and muted kinds; and the real senders, through a small SMTP server and an HTTP server in the test, including that the webhook URL never appears in an error.
+- **`decimal.test.ts`**, **`worklistState.test.ts`** (frontend) — the screen reads "1 260,00" as 1260, in step with the server; the worklist's view, search and sort survive in the URL and ignore anything unrecognised.
+- **`batchUpload.test.ts`** (frontend) — every file in a drop becomes its own published record; results come back in the order given; never more than three uploads in flight; one failure leaves the others alone; a duplicate is left as an unpublished draft that names its match; a file chosen twice is sent once; the 50-file cap; and the batch stops once the session has expired.
 
 Not covered: the Gemini client against the live API (no key available at build time), and the worker loops end to end. Both were exercised manually — see `03-tasks.md` §3.
 
@@ -244,7 +265,7 @@ Not covered: the Gemini client against the live API (no key available at build t
 | L-1 | Workers assume a single API instance | Two instances would double-process | `03-tasks.md` M2 |
 | L-2 | Gemini client unverified against the live API | Needs a key and one real PDF to confirm | `03-tasks.md` M2 |
 | L-3 | No master-data validation (FR-6.3–6.5) | Bad material/customer codes only fail at SAP | `OQ-11` |
-| L-4 | No notifications (FR-14) | Records rely on someone watching the worklist | `03-tasks.md` M2 |
+| L-4 | ~~No notifications (FR-14)~~ — done: in-app, email and Teams (see §6.1). Not covered: a process cannot report its own death, so "the result watcher stopped" is only caught when a pass hangs (5 min), not when the service is down; that needs an outside monitor on `/api/health` | — | — |
 | L-5 | No admin UI (FR-15) | Vendor profiles are seeded/DB-edited | `03-tasks.md` M2 |
 | L-6 | No concurrent-edit lock (FR-7.8) | Two reviewers can overwrite each other | `03-tasks.md` M2 |
 | L-7 | No per-field source highlighting (FR-7.4) | Reviewer scrolls the PDF themselves | needs extractor coordinates |

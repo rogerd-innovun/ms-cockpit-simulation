@@ -173,8 +173,43 @@ flagging is the most interesting thing in the product.
 - [ ] Both pre-baked records still in **Needs review**
 - [ ] Signed in as `approver@cockpit.local` (the uploader **cannot** approve — that's the
       control you want to demonstrate, so know which account you're on)
-- [ ] `SAP_SIM_FAILURE_RATE=0` if you don't want a random 15% rejection mid-demo.
-      Set it back to `0.15` afterwards — the failure path is worth showing deliberately.
+- [ ] `SAP_SIM_FAILURE_RATE` — `render.yaml` ships it as `0`, so nothing is rejected. A
+      service created before that change keeps whatever the dashboard says (the old value
+      was `0.15`, a random 15% rejection), so check **Environment** in Render. Set it to
+      `0.15` when you want to show the failure path deliberately.
+
+## Notifications (optional)
+
+The bell in the top bar works as soon as the app does. Email and Microsoft Teams are off until you
+give them somewhere to send. Both are set in the Render dashboard under **Environment**, and
+saving them restarts the service (and, on the free plan, empties the PDF cache — they are kept in
+Postgres, so the documents come back).
+
+**Email** — any SMTP account: Microsoft 365 (`smtp.office365.com`, port 587, an app password or a
+service mailbox), SendGrid, Resend, Postmark and so on.
+
+| Variable | Example |
+|---|---|
+| `SMTP_HOST` | `smtp.office365.com` |
+| `SMTP_PORT` | `587` (use `465` with `SMTP_SECURE=true`) |
+| `SMTP_USER` / `SMTP_PASS` | the mailbox and its password or app password |
+| `SMTP_FROM` | `PO Cockpit <po-cockpit@yourcompany.com>` |
+| `NOTIFY_EMAIL_OVERRIDE_TO` | **your own address, for a demo.** The seeded users have `@cockpit.local` addresses that go nowhere; this sends every email to one inbox instead, and the subject says who it was for. |
+
+**Microsoft Teams** — in the channel: **… > Workflows > "Post to a channel when a webhook request is
+received"**, finish the wizard, and copy the URL it gives you into `NOTIFY_TEAMS_WEBHOOK_URL`.
+(The older Office 365 "Incoming Webhook" connectors were retired in 2026; this is their
+replacement.) That URL is a password for the channel — treat it like one. `NOTIFY_TEAMS_KINDS`
+narrows what goes there, for example `REVIEW_NEEDED,RECORD_FAILED,INTEGRATION_ALERT`.
+
+**Check it:** sign in as `admin@cockpit.local`, open **Notifications** (the bell > *All notifications
+& settings*) and press **Send me a test notification**. The page also shows, for Operations and
+administrators, how many emails and Teams messages went out in the last 24 hours and the last error.
+Delivery is retried five times with growing pauses, so a mail server that is briefly down delays
+messages rather than losing them.
+
+I could test the email and Teams paths here against stand-in servers (real SMTP, real HTTP), but
+not against Microsoft 365 or a real Teams tenant — the test button is how you confirm yours.
 
 ## Limits you must know
 

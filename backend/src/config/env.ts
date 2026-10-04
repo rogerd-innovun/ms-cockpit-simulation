@@ -103,6 +103,49 @@ const schema = z.object({
    * NODE_ENV=production unless this is explicitly turned on.
    */
   SAP_SIM_ALLOW_IN_PRODUCTION: bool(false),
+
+  /**
+   * The assumptions behind "minutes saved" on the dashboard. These are estimates of how long
+   * a person takes, not measurements, and the dashboard says so; set them to the customer's
+   * own figures. Manual = keying a PO into SAP by hand. Review = checking what the cockpit
+   * read against the PDF, plus a little for each field that has to be corrected.
+   */
+  DASHBOARD_MANUAL_MIN_PER_PO: num(4),
+  DASHBOARD_MANUAL_MIN_PER_LINE: num(1.5),
+  DASHBOARD_REVIEW_MIN_PER_PO: num(1.5),
+  DASHBOARD_REVIEW_MIN_PER_LINE: num(0.25),
+  DASHBOARD_MIN_PER_CORRECTION: num(0.5),
+
+  // ---- FR-14 notifications. Every channel is off until configured; the in-app inbox needs nothing.
+
+  /** Where the app is reached, for the "Open" links in emails and Teams messages. */
+  PUBLIC_BASE_URL: z.string().default('http://localhost:5190'),
+  /** Email. Leave SMTP_HOST empty and no email is ever sent. */
+  SMTP_HOST: z.string().optional().default(''),
+  SMTP_PORT: int(587),
+  /** true for port 465 (TLS from the first byte); false for STARTTLS on 587 or a plain test relay. */
+  SMTP_SECURE: bool(false),
+  SMTP_USER: z.string().optional().default(''),
+  SMTP_PASS: z.string().optional().default(''),
+  /** The From address, e.g. "PO Cockpit <po-cockpit@example.com>". */
+  SMTP_FROM: z.string().optional().default(''),
+  /**
+   * Send every email to this one address instead of to its real recipients. For demos and
+   * testing: seeded users have @cockpit.local addresses that go nowhere, and a trial should
+   * not email real staff. The subject says who it was meant for.
+   */
+  NOTIFY_EMAIL_OVERRIDE_TO: z.string().optional().default(''),
+  /**
+   * A Microsoft Teams "Workflows" webhook URL for one shared channel (Workflows > "Post to a
+   * channel when a webhook request is received"). The URL is a secret: anyone holding it can
+   * post to the channel. Empty means no Teams messages.
+   */
+  NOTIFY_TEAMS_WEBHOOK_URL: z.string().optional().default(''),
+  /** Which kinds go to Teams, comma-separated (e.g. "REVIEW_NEEDED,RECORD_FAILED"). Empty means all. */
+  NOTIFY_TEAMS_KINDS: z.string().optional().default(''),
+  NOTIFY_DELIVERY_POLL_MS: int(5000),
+  /** An email or Teams message is tried this many times, with growing pauses, before it is given up on. */
+  NOTIFY_MAX_ATTEMPTS: int(5),
 });
 
 const parsed = schema.safeParse(process.env);

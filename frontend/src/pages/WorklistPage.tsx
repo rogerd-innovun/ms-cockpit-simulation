@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
+import { MAX_BATCH, summarise, uploadAndPublishAll, type BatchOutcome } from '../lib/batchUpload';
+import { parseDecimal } from '../lib/decimal';
+import { ago } from '../lib/format';
+import { readWorklist, rememberWorklist, writeWorklist, type SortKey, type WorklistState } from '../lib/worklistState';
 import { StatusBadge } from '../components/StatusBadge';
 import { statusTone, toneClass } from '../lib/status';
 import type { POStatus, WorklistRow } from '../lib/types';
@@ -17,12 +21,8 @@ const VIEWS: { key: string; label: string; tone: string; statuses?: POStatus[]; 
   { key: 'mine', label: 'Mine', tone: 't-idle', mine: true },
 ];
 
-type SortKey = 'status' | 'poNumber' | 'customer' | 'lines' | 'value' | 'soNumber' | 'age';
-
-const num = (s?: string | null) => {
-  const n = Number.parseFloat((s ?? '').replace(/[^0-9.-]/g, ''));
-  return Number.isFinite(n) ? n : -Infinity;
-};
+// Read the way the validator reads amounts, so "1.245,00" sorts as 1245 and not 124500.
+const num = (s?: string | null) => parseDecimal(s) ?? -Infinity;
 
 const keyOf = (r: WorklistRow, k: SortKey): string | number => {
   switch (k) {
@@ -40,12 +40,18 @@ const keyOf = (r: WorklistRow, k: SortKey): string | number => {
 const PAGE_SIZE = 50;
 
 export function WorklistPage() {
-  const [view, setView] = useState('all');
-  const [q, setQ] = useState('');
-  // The query fires on the debounced value, not per keystroke.
-  const [debouncedQ, setDebouncedQ] = useState('');
-  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'age', dir: -1 });
+  // The view, the search and the sort live in the URL, so opening a record and coming back
+  // (Back, the Worklist link, a reload) lands on the same list.
+  const [params, setParams] = useSearchParams();
+  const { view, q: urlQ, sort } = readWorklist(params, VIEWS.map((v) => v.key));
+  const update = (patch: Partial<WorklistState>) =>
+    setParams((prev) => writeWorklist({ ...readWorklist(prev, VIEWS.map((v) => v.key)), ...patch }), { replace: true });
+  // What is typed shows at once; the URL, and so the query, follows 300 ms after the last key.
+  const [q, setQ] = useState(urlQ);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  // A multi-file drop: progress while it runs, then what happened to each file.
+  const [batch, setBatch] = useState<{ done: number; total: number } | null>(null);
+  const [report, setReport] = useState<BatchOutcome[] | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [over, setOver] = useState(false);
@@ -57,17 +63,25 @@ export function WorklistPage() {
   const active = VIEWS.find((v) => v.key === view)!;
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(q), 300);
+    if (q === urlQ) return;
+    const t = setTimeout(() => update({ q }), 300);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
-  const filters = { status: active.statuses?.join(','), mine: active.mine, q: debouncedQ || undefined };
+  // Back / forward (or a pasted link) changes the URL under the search box.
+  useEffect(() => setQ(urlQ), [urlQ]);
+
+  // Remembered so the Worklist link on a record page can return to this list.
+  useEffect(() => rememberWorklist(params.toString()), [params]);
+
+  const filters = { status: active.statuses?.join(','), mine: active.mine, q: urlQ || undefined };
 
   // The list is paged: the footer says how much of it is on screen, and "Show more"
   // fetches the rest. It used to fetch one page and say nothing, so with more than 50
   // records the older ones were simply unreachable except by searching for them.
   const list = useInfiniteQuery({
-    queryKey: ['records', view, debouncedQ],
+    queryKey: ['records', view, urlQ],
     queryFn: ({ pageParam }) => api.list({ ...filters, take: PAGE_SIZE, skip: pageParam }),
     initialPageParam: 0,
     getNextPageParam: (last, pages) => {
@@ -137,7 +151,7 @@ export function WorklistPage() {
   const rows = useMemo(() => sortRows(loaded), [loaded, sort]);
 
   const onSort = (key: SortKey) =>
-    setSort((s) => (s.key === key ? { key, dir: (s.dir === 1 ? -1 : 1) as 1 | -1 } : { key, dir: 1 }));
+    update({ sort: sort.key === key ? { key, dir: sort.dir === 1 ? -1 : 1 } : { key, dir: 1 } });
 
   const sortProps = (key: SortKey, label: string, cls?: string) => (
     <th
@@ -151,16 +165,44 @@ export function WorklistPage() {
     </th>
   );
 
-  const takeFile = (file?: File | null) => {
+  const busy = upload.isPending || batch !== null;
+
+  /**
+   * One file opens its draft, so it can be checked before it is published. Several are each
+   * made into their own record and sent straight for extraction (FR-1.7): checking a dozen
+   * drafts one by one is the thing a batch is for avoiding, and anything that needs a
+   * person's eye (a repeat of an earlier file, a failed publish) is left as a draft and
+   * listed in the report.
+   */
+  const takeFiles = async (files: File[]) => {
     setUploadError(null);
-    if (!file) return;
-    // Some sources drop files with an empty MIME type; the server validates the
-    // actual content, so only refuse a file that positively claims to be something else.
-    if (file.type && file.type !== 'application/pdf') {
-      setUploadError(`${file.name} is not a PDF.`);
+    setReport(null);
+    if (files.length === 0) return;
+    if (busy) {
+      setUploadError('An upload is still running. Add more when it has finished.');
       return;
     }
-    upload.mutate(file);
+    if (files.length === 1) {
+      const file = files[0]!;
+      // Some sources drop files with an empty MIME type; the server validates the
+      // actual content, so only refuse a file that positively claims to be something else.
+      if (file.type && file.type !== 'application/pdf') {
+        setUploadError(`${file.name} is not a PDF.`);
+        return;
+      }
+      upload.mutate(file);
+      return;
+    }
+    setBatch({ done: 0, total: files.length });
+    try {
+      setReport(
+        await uploadAndPublishAll(files, api, { onProgress: (done, total) => setBatch({ done, total }) }),
+      );
+    } finally {
+      setBatch(null);
+      qc.invalidateQueries({ queryKey: ['records'] });
+      qc.invalidateQueries({ queryKey: ['counts'] });
+    }
   };
 
   /**
@@ -224,7 +266,7 @@ export function WorklistPage() {
       className={`dropzone ${over ? 'over' : ''}`}
       onDragOver={(e) => { e.preventDefault(); setOver(true); }}
       onDragLeave={(e) => { if (e.currentTarget === e.target) setOver(false); }}
-      onDrop={(e) => { e.preventDefault(); setOver(false); takeFile(e.dataTransfer.files?.[0]); }}
+      onDrop={(e) => { e.preventDefault(); setOver(false); void takeFiles(Array.from(e.dataTransfer.files ?? [])); }}
     >
       <div className="sheet">
         <div className="head">
@@ -232,7 +274,7 @@ export function WorklistPage() {
             <div>
               <h1>Purchase orders</h1>
               <p className="cap">
-                Drop a PDF anywhere on this page, or press <kbd>/</kbd> to search.
+                Drop PDFs anywhere on this page &mdash; up to {MAX_BATCH} at once &mdash; or press <kbd>/</kbd> to search.
               </p>
             </div>
             <div className="spacer" />
@@ -241,8 +283,10 @@ export function WorklistPage() {
                 ref={fileRef}
                 type="file"
                 accept="application/pdf"
+                multiple
                 hidden
-                onChange={(e) => { takeFile(e.target.files?.[0]); e.target.value = ''; }}
+                // Copied out before the value is cleared: the FileList is live and empties with it.
+                onChange={(e) => { const picked = Array.from(e.target.files ?? []); e.target.value = ''; void takeFiles(picked); }}
               />
               <button
                 className="quiet sm"
@@ -252,34 +296,37 @@ export function WorklistPage() {
               >
                 {exporting ? 'Exporting…' : 'Export CSV'}
               </button>
-              <button className="primary" onClick={() => fileRef.current?.click()} disabled={upload.isPending}>
-                {upload.isPending ? 'Uploading…' : 'Upload PO PDF'}
+              <button className="primary" onClick={() => fileRef.current?.click()} disabled={busy}>
+                {batch ? `Uploading ${batch.done} of ${batch.total}…` : upload.isPending ? 'Uploading…' : 'Upload PO PDFs'}
               </button>
             </div>
           </div>
         </div>
 
         {uploadError && <div className="err" role="alert">{uploadError}</div>}
+        {report && <BatchReport outcomes={report} onDismiss={() => setReport(null)} />}
         {exportError && <div className="err" role="alert">{exportError}</div>}
 
         <div className="tabrule" role="group" aria-label="Filter by state">
-          {VIEWS.map((v) => {
-            const n = countFor(v);
-            return (
-              <button
-                key={v.key}
-                className={`tab ${v.tone}`}
-                aria-pressed={view === v.key}
-                onClick={() => setView(v.key)}
-              >
-                {v.statuses && <span className="lamp" aria-hidden="true" />}
-                {v.label}
-                {n != null && <span className="n">{n}</span>}
-              </button>
-            );
-          })}
+          <div className="tabs">
+            {VIEWS.map((v) => {
+              const n = countFor(v);
+              return (
+                <button
+                  key={v.key}
+                  className={`tab ${v.tone}`}
+                  aria-pressed={view === v.key}
+                  onClick={() => update({ view: v.key })}
+                >
+                  {v.statuses && <span className="lamp" aria-hidden="true" />}
+                  {v.label}
+                  {n != null && <span className="n">{n}</span>}
+                </button>
+              );
+            })}
+          </div>
           <div className="spacer" />
-          <div className="search" style={{ margin: '4px 0 6px' }}>
+          <div className="search">
             <span className="faint" aria-hidden="true">⌕</span>
             <input
               ref={searchRef}
@@ -301,7 +348,7 @@ export function WorklistPage() {
           </div>
         ) : !rows.length ? (
           <div className="empty">
-            {q ? `Nothing matches “${q}”.` : 'Nothing here yet. Drop a PO PDF to get started.'}
+            {q ? `Nothing matches “${q}”.` : 'Nothing here yet. Drop one or more PO PDFs to get started.'}
           </div>
         ) : (
           <div className="ledger-wrap">
@@ -352,7 +399,7 @@ export function WorklistPage() {
                       <td className="mono">{r.soNumber ?? <span className="faint">—</span>}</td>
                       <td className="muted">{r.uploadedBy.name}</td>
                       <td className="mono faint" title={r.correlationId}>{r.correlationId.slice(0, 11)}…</td>
-                      <td className="num muted tnum">{age(r.statusChangedAt)}</td>
+                      <td className="num muted tnum">{ago(r.statusChangedAt)}</td>
                     </tr>
                   );
                 })}
@@ -384,12 +431,42 @@ export function WorklistPage() {
   );
 }
 
-function age(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(ms / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}d`;
+/**
+ * What became of each file in a multi-file drop. The ones that went smoothly are a count;
+ * anything that needs a person is named, with the reason and a way to open it.
+ */
+function BatchReport({ outcomes, onDismiss }: { outcomes: BatchOutcome[]; onDismiss: () => void }) {
+  const s = summarise(outcomes);
+  const attention = outcomes.filter((o) => o.kind !== 'queued');
+  const parts = [
+    s.queued > 0 && `${s.queued} sent for extraction`,
+    s.draft > 0 && `${s.draft} left as ${s.draft === 1 ? 'a draft' : 'drafts'}`,
+    s.skipped > 0 && `${s.skipped} skipped`,
+    s.failed > 0 && `${s.failed} could not be uploaded`,
+  ].filter(Boolean);
+  return (
+    <div className={`notice ${attention.length > 0 ? 't-warn' : 't-ok'}`} role="status" style={{ marginTop: 12 }}>
+      <b>{outcomes.length} files: {parts.join(' · ')}</b>
+      {s.queued > 0 && (
+        <span>
+          They are being read now, one after another, and will appear under Needs review as each finishes.
+          Nothing goes to SAP until someone approves it.
+        </span>
+      )}
+      {attention.map((o, i) => (
+        <span key={`${o.file}-${i}`}>
+          <b>{o.file}</b> &mdash; {o.kind === 'draft' || o.kind === 'skipped' || o.kind === 'failed' ? o.reason : ''}
+          {o.kind === 'draft' && (
+            <>
+              {' '}
+              <Link to={`/records/${o.recordId}`}>Open</Link>
+            </>
+          )}
+        </span>
+      ))}
+      <div>
+        <button className="quiet sm" onClick={onDismiss}>Dismiss</button>
+      </div>
+    </div>
+  );
 }

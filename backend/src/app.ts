@@ -4,6 +4,8 @@ import helmet from 'helmet';
 import { env } from './config/env.js';
 import { prisma } from './db/client.js';
 import { authRouter } from './modules/auth/routes.js';
+import { dashboardRouter } from './modules/dashboard/routes.js';
+import { notificationsRouter } from './modules/notifications/routes.js';
 import { recordsRouter } from './modules/records/routes.js';
 import { sapLogRouter } from './modules/sapLog/routes.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
@@ -69,6 +71,8 @@ export function createApp() {
   });
 
   app.use('/api/auth', authRouter);
+  app.use('/api/dashboard', dashboardRouter);
+  app.use('/api/notifications', notificationsRouter);
   app.use('/api/records', sapLogRouter);
   app.use('/api/records', recordsRouter);
 

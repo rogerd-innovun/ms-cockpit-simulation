@@ -189,6 +189,7 @@ Every requirement in this document that creates friction (the review screen, the
 | T-12 | `SENT_TO_SAP` | `FAILED` | Failure result file matched, **or** SLA timeout elapsed | — |
 | T-13 | `FAILED` | `NEEDS_REVIEW` | User clicks Resubmit | New submission attempt number allocated |
 | T-14 | `DRAFT` / `NEEDS_REVIEW` / `EXTRACTION_FAILED` | `CANCELLED` | User cancels | — |
+| T-15 | `FAILED` | `SO_CREATED` | Success result file for the **current attempt** arrives after the SLA timeout (`FR-10.12`) | Record is still `FAILED` with reason `NO_RESPONSE_FROM_SAP`; system-triggered only, never a user action |
 
 **Invariants**
 
@@ -216,7 +217,7 @@ Acceptance criteria use EARS phrasing (`WHEN <trigger> THE SYSTEM SHALL <respons
 4. THE SYSTEM SHALL compute and store a SHA-256 hash of the uploaded file for duplicate detection (`FR-3.4`) and integrity verification.
 5. THE SYSTEM SHALL record upload metadata: original filename, size, content hash, page count, uploading user, and upload timestamp (UTC).
 6. THE SYSTEM SHALL allocate the record's immutable **correlation ID** at creation time (`FR-8.1`).
-7. WHERE a user uploads multiple files in one action, THE SYSTEM SHALL create one independent PO Record per file.
+7. WHERE a user uploads multiple files in one action, THE SYSTEM SHALL create one independent PO Record per file, SHALL publish each of them for extraction (`FR-3.1`), and SHALL report what became of every file. A file that cannot be uploaded, or that duplicates an existing record (`FR-3.4`), SHALL NOT stop the others; a duplicate is left in `DRAFT` for a person to publish with a reason. Publishing is as far as a batch goes — approval is never automatic. A single file still opens its draft for checking before it is published.
 8. IF file storage fails, THEN THE SYSTEM SHALL NOT create a record and SHALL report the failure to the user.
 9. THE SYSTEM SHALL retain the original PDF for the full retention period (`NFR-7.1`) and SHALL keep it viewable at every subsequent lifecycle stage.
 
@@ -413,6 +414,8 @@ Acceptance criteria use EARS phrasing (`WHEN <trigger> THE SYSTEM SHALL <respons
 9. THE SYSTEM SHALL process result ingestion **idempotently**: reprocessing the same result file SHALL NOT produce duplicate status changes or duplicate notifications.
 10. WHEN a result file has been successfully processed, THE SYSTEM SHALL archive it to a dated archive location rather than deleting it.
 11. THE SYSTEM SHALL store the raw result file content against the record.
+12. WHEN a result for the record's current attempt arrives after the SLA timeout of `FR-10.5` and the record is still `FAILED` with reason `NO_RESPONSE_FROM_SAP`, THE SYSTEM SHALL apply it: a success completes the record (`SO_CREATED`, SO number stored, `T-15`) and a rejection replaces the timeout with SAP's own error code and message. The timeout is a presumption; a result file is the fact.
+13. WHEN a result cannot be applied (it answers a superseded attempt, or the record has since been reopened, cancelled or completed), THE SYSTEM SHALL still store it, SHALL name the outcome and any Sales Order number in the audit message, and SHALL show the record's detail view a warning for every Sales Order SAP created that the record is not linked to — so that approving again, or a duplicate left behind in SAP, is never a surprise.
 
 ---
 
@@ -466,6 +469,20 @@ Acceptance criteria use EARS phrasing (`WHEN <trigger> THE SYSTEM SHALL <respons
 3. THE SYSTEM SHALL alert Operations on integration-level failures: drop folder unwritable, result watcher stopped, unmatched result file, SLA timeout.
 4. THE SYSTEM SHALL let users configure which notifications they receive and through which channel (in-app at minimum; email where configured).
 5. THE SYSTEM SHALL NOT send duplicate notifications for a single state change (`FR-10.9`).
+6. THE SYSTEM SHALL offer, besides the in-app inbox, email and a shared Microsoft Teams channel, each off until configured; WHERE a channel is configured, it SHALL send through a database-backed outbox that retries a failed send with growing pauses and gives up only after a bounded number of tries, so a slow or unavailable mail server never delays extraction, approval or SAP handling.
+7. THE SYSTEM SHALL tell the uploader only about records that are theirs (sent back, rejected, created), the approvers about records ready for review, and Operations about failures and integration problems; and SHALL keep credentials for the channels (SMTP password, webhook URL) out of every message, log line and API response.
+8. THE SYSTEM SHALL let an administrator send a test notification through every configured channel, and let Operations and administrators see recent delivery outcomes.
+
+---
+
+### FR-16 — Dashboard
+
+**User story:** As a sponsor, I want one page that says what the cockpit has done, so that its value can be judged on figures rather than on a demonstration.
+
+1. THE SYSTEM SHALL show, for the POs uploaded in a chosen period (7, 30, 90 days, or all time): how many were read, approved and turned into Sales Orders; the share of approved POs that needed no edit; what reviewers caught before SAP (send-backs, corrected fields, warnings accepted); what SAP rejected, by error code, and how many of those were since fixed; field accuracy as measured by human corrections; the median time from upload to Sales Order; and a daily throughput chart.
+2. THE SYSTEM SHALL separate what is counted from what is assumed. The one assumed figure, time saved, SHALL be labelled an estimate, SHALL be computed from stated, configurable assumptions, and SHALL show them.
+3. THE SYSTEM SHALL show where the work sits now across all POs, each count linking to the matching worklist view.
+4. THE SYSTEM SHALL be read-only and available to every signed-in role.
 
 ---
 
@@ -713,6 +730,7 @@ Recorded here so they are not lost between phases. These are inputs to `02-desig
 | FR-13 | Audit trail |
 | FR-14 | Notifications |
 | FR-15 | Administration |
+| FR-16 | Dashboard |
 | NFR-1…7 | Performance, reliability, security, usability, observability, maintainability, retention |
 | IC-01…12 | Integration contract |
 | OQ-01…13 | Open questions |

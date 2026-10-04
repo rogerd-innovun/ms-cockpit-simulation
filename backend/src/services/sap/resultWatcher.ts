@@ -1,9 +1,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import type { PORecord, Prisma } from '@prisma/client';
 import { env } from '../../config/env.js';
 import { prisma } from '../../db/client.js';
+import { assertTransition } from '../../domain/status.js';
 import { childLogger } from '../../lib/logger.js';
 import { writeAudit } from '../audit.js';
+import { notifyIntegration, notifyRecord } from '../notifications/notify.js';
 import { ResultParseError, parseResultFile, type ParsedResult } from './resultParser.js';
 
 const log = childLogger('sap-result-watcher');
@@ -78,7 +81,119 @@ async function quarantine(
     message: `${filename}: ${reason}`,
     actorName: 'sap-result-watcher',
   });
+  // FR-14.3 — an unmatched or unreadable result is nobody's record to notice; Operations has to.
+  await notifyIntegration(
+    `quarantine:${filename}:${Date.now()}`,
+    'A SAP result file could not be used',
+    `${filename} was set aside: ${reason}`,
+  );
   log.error({ filename, reason }, 'result file quarantined — needs operations attention');
+}
+
+/**
+ * SAP says it created an order that this record cannot take. Nobody is looking at the record
+ * when that happens, and the order now exists in SAP, so Operations is told (FR-14.3).
+ */
+async function warnOfUnlinkedOrder(recordId: string, parsed: ParsedResult, what: string): Promise<void> {
+  await notifyIntegration(
+    `unlinked-order:${parsed.correlationId}:${parsed.soNumber}`,
+    'SAP created an order that no record is linked to',
+    `Sales Order ${parsed.soNumber} is SAP's answer to ${what} of ${parsed.correlationId}. Check it before the record is approved again, or cancel it in SAP if it is a duplicate.`,
+    recordId,
+  );
+}
+
+/** How a result reads in the audit trail. */
+function describeResult(parsed: ParsedResult): string {
+  return parsed.outcome === 'SUCCESS'
+    ? `SAP created Sales Order ${parsed.soNumber}`
+    : `SAP rejected the order: ${parsed.errorCode ?? 'no code'} — ${parsed.errorMessage ?? 'no message'}`;
+}
+
+/** The stored copy of a result file (FR-10.11), whatever became of the record. */
+function resultRow(
+  record: { id: string; currentAttempt: number },
+  parsed: ParsedResult,
+  content: string,
+  filename: string,
+): Prisma.SapResultUncheckedCreateInput {
+  return {
+    recordId: record.id,
+    correlationId: parsed.correlationId,
+    attempt: parsed.attempt ?? record.currentAttempt,
+    outcome: parsed.outcome,
+    soNumber: parsed.soNumber,
+    errorCode: parsed.errorCode,
+    errorMessage: parsed.errorMessage,
+    sapTimestamp: parsed.sapTimestamp,
+    rawContent: content,
+    sourceFilename: filename,
+  };
+}
+
+/**
+ * SAP answered the current attempt after the SLA sweep had already marked the record FAILED
+ * with NO_RESPONSE_FROM_SAP. "Created" completes the record; a rejection replaces the
+ * timeout with the real reason. Either way the record is claimed with a conditional update,
+ * so if someone resubmitted in the meantime it is left alone and false is returned.
+ */
+async function applyLateAnswer(
+  record: PORecord,
+  filename: string,
+  content: string,
+  parsed: ParsedResult,
+): Promise<boolean> {
+  const success = parsed.outcome === 'SUCCESS';
+  if (success) assertTransition('FAILED', 'SO_CREATED');
+
+  const applied = await prisma.$transaction(async (tx) => {
+    const claimed = await tx.pORecord.updateMany({
+      where: {
+        id: record.id,
+        status: 'FAILED',
+        failureCode: 'NO_RESPONSE_FROM_SAP',
+        currentAttempt: record.currentAttempt,
+      },
+      data: success
+        ? {
+            status: 'SO_CREATED',
+            statusChangedAt: new Date(),
+            soNumber: parsed.soNumber,
+            failureCode: null,
+            failureMessage: null,
+          }
+        : {
+            statusChangedAt: new Date(),
+            failureCode: parsed.errorCode ?? 'SAP_REJECTED',
+            failureMessage: parsed.errorMessage ?? 'SAP rejected the order without a reason.',
+          },
+    });
+    if (claimed.count !== 1) return false;
+    await tx.sapResult.create({ data: resultRow(record, parsed, content, filename) });
+    return true;
+  });
+  if (!applied) return false;
+
+  await writeAudit({
+    recordId: record.id,
+    eventType: 'RESULT_INGESTED',
+    message: `${describeResult(parsed)}. It arrived after the ${Math.round(
+      env.SAP_SLA_TIMEOUT_MS / 60000,
+    )}-minute limit that had marked this record FAILED.`,
+    after: { ...parsed },
+    actorName: 'sap-result-watcher',
+  });
+  if (success) {
+    await writeAudit({
+      recordId: record.id,
+      eventType: 'STATUS_CHANGED',
+      message: 'FAILED → SO_CREATED (SAP answered after the timeout)',
+      actorName: 'sap-result-watcher',
+    });
+  }
+  log.warn({ filename, recordId: record.id, success }, 'SAP answered after the SLA timeout; result applied');
+  await notifyRecord(success ? 'SO_CREATED' : 'RECORD_FAILED', record.id);
+  return true;
 }
 
 async function applyResult(
@@ -103,43 +218,56 @@ async function applyResult(
     return;
   }
 
-  // FR-10.8 — a result for a superseded attempt must never move the record.
+  // FR-10.8 — a result for a superseded attempt must never move the record. It is still
+  // kept, and its outcome goes in the audit message: an attempt-1 "created" arriving
+  // while the record is on attempt 2 means SAP now holds an order this record does not
+  // know about, and whoever reads the history needs to be able to see which one.
   if (parsed.attempt != null && parsed.attempt !== record.currentAttempt) {
-    await prisma.sapResult.create({
-      data: {
-        recordId: record.id,
-        correlationId: parsed.correlationId,
-        attempt: parsed.attempt,
-        outcome: parsed.outcome,
-        soNumber: parsed.soNumber,
-        errorCode: parsed.errorCode,
-        errorMessage: parsed.errorMessage,
-        sapTimestamp: parsed.sapTimestamp,
-        rawContent: content,
-        sourceFilename: filename,
-      },
-    });
+    await prisma.sapResult.create({ data: resultRow(record, parsed, content, filename) });
     await writeAudit({
       recordId: record.id,
       eventType: 'RESULT_STALE_IGNORED',
-      message: `Ignored result for attempt ${parsed.attempt}; the record is on attempt ${record.currentAttempt}.`,
+      message: `Ignored result for attempt ${parsed.attempt}; the record is on attempt ${record.currentAttempt}. ${describeResult(parsed)}.`,
+      after: { ...parsed },
       actorName: 'sap-result-watcher',
     });
     await removeMarker(path.dirname(sourcePath), filename);
     await moveTo(env.paths.archive, sourcePath, filename);
     log.warn({ filename, recordId: record.id }, 'stale result ignored');
+    if (parsed.outcome === 'SUCCESS') await warnOfUnlinkedOrder(record.id, parsed, `an earlier attempt (${parsed.attempt})`);
     return;
   }
 
   if (record.status !== 'SENT_TO_SAP') {
+    // FR-10.5 marks a record FAILED when SAP is merely slow, and that is a presumption. If
+    // SAP then answers that very attempt, the answer is the fact. Nothing has touched the
+    // record since the timeout (any resubmission would have moved it out of FAILED), so
+    // the answer can be applied without guessing.
+    if (
+      record.status === 'FAILED' &&
+      record.failureCode === 'NO_RESPONSE_FROM_SAP' &&
+      (await applyLateAnswer(record, filename, content, parsed))
+    ) {
+      await removeMarker(path.dirname(sourcePath), filename);
+      await moveTo(env.paths.archive, sourcePath, filename);
+      return;
+    }
+
+    // Anywhere else (already SO_CREATED, cancelled, or reopened for rework after the
+    // timeout) it cannot be applied, but it is not thrown away either: the row keeps the
+    // Sales Order number and the audit message says what SAP did.
+    await prisma.sapResult.create({ data: resultRow(record, parsed, content, filename) });
     await writeAudit({
       recordId: record.id,
       eventType: 'RESULT_STALE_IGNORED',
-      message: `Result arrived while the record was in ${record.status}; no status change applied.`,
+      message: `Result arrived while the record was in ${record.status}; no status change applied. ${describeResult(parsed)}.`,
+      after: { ...parsed },
       actorName: 'sap-result-watcher',
     });
     await removeMarker(path.dirname(sourcePath), filename);
     await moveTo(env.paths.archive, sourcePath, filename);
+    log.warn({ filename, recordId: record.id, status: record.status }, 'result arrived for a record that was not waiting for one');
+    if (parsed.outcome === 'SUCCESS') await warnOfUnlinkedOrder(record.id, parsed, `a record that was ${record.status}`);
     return;
   }
 
@@ -148,20 +276,7 @@ async function applyResult(
   // FR-10.9 — the unique constraint on sourceFilename makes reprocessing the same file
   // a no-op rather than a duplicate status change.
   await prisma.$transaction(async (tx) => {
-    await tx.sapResult.create({
-      data: {
-        recordId: record.id,
-        correlationId: parsed.correlationId,
-        attempt: parsed.attempt ?? record.currentAttempt,
-        outcome: parsed.outcome,
-        soNumber: parsed.soNumber,
-        errorCode: parsed.errorCode,
-        errorMessage: parsed.errorMessage,
-        sapTimestamp: parsed.sapTimestamp,
-        rawContent: content,
-        sourceFilename: filename,
-      },
-    });
+    await tx.sapResult.create({ data: resultRow(record, parsed, content, filename) });
     await tx.pORecord.update({
       where: { id: record.id },
       data: success
@@ -200,6 +315,7 @@ async function applyResult(
   await removeMarker(path.dirname(sourcePath), filename);
   // FR-10.10 — archived, not deleted.
   await moveTo(env.paths.archive, sourcePath, filename);
+  await notifyRecord(success ? 'SO_CREATED' : 'RECORD_FAILED', record.id);
   log.info({ filename, recordId: record.id, success }, 'result ingested');
 }
 
@@ -306,6 +422,7 @@ export async function sweepSlaTimeouts(): Promise<number> {
       message: 'SENT_TO_SAP → FAILED (SLA timeout)',
       actorName: 'sap-result-watcher',
     });
+    await notifyRecord('RECORD_FAILED', record.id);
     log.error({ recordId: record.id }, 'SLA timeout — no result from SAP');
   }
 

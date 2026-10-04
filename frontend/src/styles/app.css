@@ -384,7 +384,7 @@ table.ledger tbody tr.flagged td:first-child { box-shadow: inset 3px 0 0 var(--t
 
 .dropzone { position: relative; }
 .dropzone.over::after {
-  content: 'Drop the PO PDF to upload';
+  content: 'Drop PO PDFs to upload';
   position: fixed;
   inset: var(--bar-h) 0 0 0;
   z-index: 60;
@@ -721,6 +721,185 @@ table.lines td.cell-flag { background: color-mix(in srgb, var(--mark) 7%, transp
 .fieldrow.cursor label { color: var(--ink); font-weight: 600; }
 
 /* -------------------------------------------------------- reduced motion --- */
+
+/* -------------------------------------------------------------- navigation --- */
+
+.nav { display: flex; gap: 2px; margin-left: 14px; align-self: stretch; }
+.nav a {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 11px;
+  font-size: 13px;
+  color: var(--ink-3);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.nav a:hover { color: var(--ink); }
+.nav a.active { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+
+/* ---------------------------------------------------------------- dashboard --- */
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  margin-top: 20px;
+  border-top: 1px solid var(--ink);
+}
+.kpis.quiet { margin-top: 6px; border-top: 0; }
+.kpi { padding: 14px 18px 14px 16px; border-left: 1px solid var(--rule); min-width: 0; }
+.kpi:first-child { border-left: 0; padding-left: 0; }
+.kpi-l { font-size: 11.5px; color: var(--ink-3); display: flex; gap: 8px; align-items: baseline; }
+.kpi-note {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  border: 1px solid var(--rule-strong);
+  padding: 0 4px;
+  border-radius: 2px;
+}
+.kpi-n {
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-top: 6px;
+  color: var(--tone, var(--ink));
+}
+.kpi-sub { font-size: 12px; color: var(--ink-2); margin-top: 4px; }
+
+.legend { font-size: 11.5px; color: var(--ink-3); display: inline-flex; align-items: center; gap: 6px; }
+.swatch { display: inline-block; width: 10px; height: 10px; margin-left: 10px; }
+.swatch.up, .bar.up { background: var(--sig-info); fill: var(--sig-info); }
+.swatch.done, .bar.done { background: var(--sig-ok); fill: var(--sig-ok); }
+.chart { width: 100%; height: auto; display: block; margin-top: 8px; }
+.chart .grid { stroke: var(--rule); stroke-width: 1; }
+.chart .axis { fill: var(--ink-3); font-size: 10px; font-family: var(--font-mono); }
+
+.dash-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; margin-top: 26px; }
+.dash-cols > .sec { margin-top: 0; }
+.stat-list { list-style: none; margin: 4px 0 0; padding: 0; }
+.stat-list li { display: flex; align-items: baseline; gap: 10px; padding: 8px 0; border-bottom: 1px dotted var(--rule); font-size: 13px; }
+.stat-list li b { font-weight: 600; }
+.stat-list li .lamp { width: 7px; height: 7px; background: var(--tone, var(--sig-idle)); align-self: center; }
+.stat-list li a { color: var(--ink); }
+
+details.how { margin-top: 28px; border-top: 1px solid var(--rule-strong); padding-top: 10px; font-size: 12.5px; color: var(--ink-2); max-width: 760px; }
+details.how summary { cursor: pointer; color: var(--ink-2); }
+details.how p { margin: 8px 0 0; line-height: 1.55; }
+
+@media (max-width: 760px) {
+  .dash-cols { grid-template-columns: 1fr; }
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .kpi:nth-child(odd) { border-left: 0; padding-left: 0; }
+  .kpi-n { font-size: 32px; }
+}
+
+/* ---------------------------------------------------------- notifications --- */
+
+.bell { position: relative; }
+.bell-btn { position: relative; display: inline-flex; align-items: center; padding: 6px 8px; }
+.bell-n {
+  position: absolute;
+  top: -4px;
+  right: -3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--sig-crit, var(--mark));
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
+.bell-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: min(400px, calc(100vw - 24px));
+  background: var(--sheet);
+  border: 1px solid var(--rule-strong);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.28);
+  z-index: 70;
+}
+.bell-head { display: flex; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--rule); font-size: 13px; }
+.bell-list { list-style: none; margin: 0; padding: 0; max-height: 430px; overflow-y: auto; }
+.bell-list.full { max-height: none; border-top: 1px solid var(--ink); margin-top: 6px; }
+.bell-list li + li { border-top: 1px solid var(--rule); }
+.n-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; color: var(--ink); text-decoration: none; }
+a.n-row:hover { background: var(--wash); }
+.n-row .lamp { width: 7px; height: 7px; background: var(--tone, var(--sig-idle)); margin-top: 6px; flex: none; }
+.n-row.unread { background: color-mix(in srgb, var(--tone, var(--sig-idle)) 7%, transparent); }
+.n-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.n-title { font-size: 13px; }
+.n-row.unread .n-title { font-weight: 600; }
+.n-body {
+  font-size: 12px;
+  color: var(--ink-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.n-time { flex: none; margin-top: 1px; }
+.bell-empty { margin: 0; padding: 18px 14px; font-size: 12.5px; color: var(--ink-3); }
+.bell-foot { padding: 9px 12px; border-top: 1px solid var(--rule); font-size: 12.5px; }
+
+table.prefs { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 4px; }
+table.prefs th { text-align: left; font-size: 11px; font-weight: 600; color: var(--ink-3); padding: 6px 8px 6px 0; border-bottom: 1px solid var(--ink); }
+table.prefs td { padding: 10px 8px 10px 0; border-bottom: 1px dotted var(--rule); vertical-align: top; }
+table.prefs .c { text-align: center; width: 92px; }
+table.prefs input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--ink); }
+.err-inline { color: var(--mark); margin-left: 10px; }
+
+/* ------------------------------------------------------- narrow screens --- */
+
+/* The state tabs scroll on their own, so the search box stays reachable beside them. */
+.tabs { display: flex; min-width: 0; overflow-x: auto; }
+.tabrule .search { margin: 4px 0 6px; }
+
+/* A phone is not where POs get reviewed, but the app must not break on one: nothing may
+   push the page wider than the screen, and the controls that matter stay on it. */
+@media (max-width: 640px) {
+  /* two rows: the brand and the controls on top, the navigation under them */
+  :root { --bar-h: 84px; }
+  .topbar { gap: 8px; padding: 0 12px; height: auto; min-height: var(--bar-h); flex-wrap: wrap; align-content: center; row-gap: 0; }
+  .topbar .who { display: none; }
+  .brand-name { font-size: 15px; white-space: nowrap; }
+  .brand-sub, .topbar .state .cap, .who .role { display: none; }
+  .nav { order: 9; flex: 1 0 100%; margin: 6px -12px 0; padding: 0 6px; border-top: 1px solid var(--rule); }
+  .nav a { padding: 9px 12px; font-size: 13px; }
+  .bell-panel { position: fixed; left: 12px; right: 12px; width: auto; top: calc(var(--bar-h) + 6px); }
+
+  .sheet { padding: 0 14px; }
+  .head { padding-top: 18px; }
+  .head-row { gap: 12px; }
+  .head h1 { font-size: 26px; }
+
+  /* search on its own full-width row above the tabs */
+  .tabrule { flex-wrap: wrap; overflow: visible; }
+  .tabrule .spacer { display: none; }
+  .tabrule .search { order: -1; flex: 1 1 100%; max-width: none; margin: 12px 0 4px; }
+  .tabs { flex: 1 1 100%; }
+
+  /* the ledger scrolls inside its own pane; fewer columns means less of that */
+  table.ledger th:nth-child(4), table.ledger td:nth-child(4),
+  table.ledger th:nth-child(7), table.ledger td:nth-child(7),
+  table.ledger th:nth-child(8), table.ledger td:nth-child(8) { display: none; }
+  table.ledger tbody td, table.ledger thead th { padding-left: 8px; padding-right: 8px; }
+
+  .rec-title { font-size: 26px; }
+  .rec-head { gap: 12px; }
+  .rail { overflow-x: auto; }
+  .rail-step { flex: 0 0 auto; min-width: 76px; }
+  .actions { gap: 6px; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
