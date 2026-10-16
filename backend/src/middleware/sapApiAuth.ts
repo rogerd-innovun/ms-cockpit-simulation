@@ -41,6 +41,21 @@ export const allowedIps = (): string[] =>
   env.SAP_API_ALLOWED_IPS.split(',').map((s) => s.trim()).filter(Boolean);
 
 /**
+ * What the server actually saw, for the log line of a turned-away call: the address it settled on,
+ * the socket's own peer, the raw X-Forwarded-For chain and how many proxies are trusted. When an
+ * allow-list rejects SAP, this is what shows whether the proxy count is wrong. None of it is secret.
+ */
+export function callerTrace(req: Pick<Request, 'ip' | 'headers' | 'socket'>) {
+  const forwarded = req.headers['x-forwarded-for'];
+  return {
+    ip: normaliseIp(req.ip),
+    socket: normaliseIp(req.socket?.remoteAddress),
+    forwardedFor: (Array.isArray(forwarded) ? forwarded.join(', ') : forwarded ?? '').slice(0, 200),
+    trustProxy: env.TRUST_PROXY,
+  };
+}
+
+/**
  * The key, from "Authorization: Bearer <key>", "X-API-Key: <key>", or an ordinary HTTP Basic
  * login whose password is the key (what ABAP's HTTP client does natively). Basic also has to
  * carry the configured user name, so a login with the wrong name fails like a wrong key.
@@ -88,7 +103,7 @@ export function sapApiAuth(req: Request, res: Response, next: NextFunction) {
   const ip = normaliseIp(req.ip);
 
   if (!ipAllowed(ip, allowedIps())) {
-    log.warn({ ip }, 'SAP API call from an address that is not allowed');
+    log.warn(callerTrace(req), 'SAP API call from an address that is not allowed');
     return next(new AppError(403, 'This address is not allowed to use the SAP API.', 'IP_NOT_ALLOWED'));
   }
 
@@ -101,7 +116,7 @@ export function sapApiAuth(req: Request, res: Response, next: NextFunction) {
   if (!keyMatches(presentedKey(req), env.SAP_API_KEY)) {
     const fresh = !seen || now - seen.since >= WINDOW_MS;
     failures.set(ip, { n: fresh ? 1 : seen.n + 1, since: fresh ? now : seen.since });
-    log.warn({ ip }, 'SAP API call with a missing or wrong key');
+    log.warn(callerTrace(req), 'SAP API call with a missing or wrong key');
     // A 401 that asks for Basic login is what makes an HTTP client offer its credentials.
     res.setHeader('WWW-Authenticate', 'Basic realm="PO Cockpit SAP API", charset="UTF-8"');
     return next(
