@@ -196,26 +196,35 @@ async function applyLateAnswer(
   return true;
 }
 
+/** What became of a result. */
+export type ApplyOutcome = 'applied' | 'applied-late' | 'ignored-stale' | 'ignored-not-waiting' | 'unmatched';
+
+/**
+ * What the two ways of receiving a result do differently: a file is archived (or quarantined)
+ * when it has been dealt with, an HTTPS call has nothing to tidy. Everything else — which
+ * answers move a record and which are only kept — is the same code (FR-10.4 to FR-10.9).
+ */
+interface Sink {
+  /** The result has been dealt with (applied or kept as evidence). */
+  settle(): Promise<void>;
+  /** No record matches the correlation ID (FR-10.6). */
+  unmatched(reason: string): Promise<void>;
+}
+
 async function applyResult(
   filename: string,
-  sourcePath: string,
   content: string,
   parsed: ParsedResult,
-): Promise<void> {
+  sink: Sink,
+): Promise<ApplyOutcome> {
   const record = await prisma.pORecord.findUnique({
     where: { correlationId: parsed.correlationId },
   });
 
   // FR-10.6 — a result we cannot match to a record is an operations problem, not a no-op.
   if (!record) {
-    await quarantine(
-      filename,
-      sourcePath,
-      content,
-      `No PO record matches correlation ID ${parsed.correlationId}.`,
-      parsed.correlationId,
-    );
-    return;
+    await sink.unmatched(`No PO record matches correlation ID ${parsed.correlationId}.`);
+    return 'unmatched';
   }
 
   // FR-10.8 — a result for a superseded attempt must never move the record. It is still
@@ -231,11 +240,10 @@ async function applyResult(
       after: { ...parsed },
       actorName: 'sap-result-watcher',
     });
-    await removeMarker(path.dirname(sourcePath), filename);
-    await moveTo(env.paths.archive, sourcePath, filename);
+    await sink.settle();
     log.warn({ filename, recordId: record.id }, 'stale result ignored');
     if (parsed.outcome === 'SUCCESS') await warnOfUnlinkedOrder(record.id, parsed, `an earlier attempt (${parsed.attempt})`);
-    return;
+    return 'ignored-stale';
   }
 
   if (record.status !== 'SENT_TO_SAP') {
@@ -248,9 +256,8 @@ async function applyResult(
       record.failureCode === 'NO_RESPONSE_FROM_SAP' &&
       (await applyLateAnswer(record, filename, content, parsed))
     ) {
-      await removeMarker(path.dirname(sourcePath), filename);
-      await moveTo(env.paths.archive, sourcePath, filename);
-      return;
+      await sink.settle();
+      return 'applied-late';
     }
 
     // Anywhere else (already SO_CREATED, cancelled, or reopened for rework after the
@@ -264,11 +271,10 @@ async function applyResult(
       after: { ...parsed },
       actorName: 'sap-result-watcher',
     });
-    await removeMarker(path.dirname(sourcePath), filename);
-    await moveTo(env.paths.archive, sourcePath, filename);
+    await sink.settle();
     log.warn({ filename, recordId: record.id, status: record.status }, 'result arrived for a record that was not waiting for one');
     if (parsed.outcome === 'SUCCESS') await warnOfUnlinkedOrder(record.id, parsed, `a record that was ${record.status}`);
-    return;
+    return 'ignored-not-waiting';
   }
 
   const success = parsed.outcome === 'SUCCESS';
@@ -312,11 +318,42 @@ async function applyResult(
     actorName: 'sap-result-watcher',
   });
 
-  await removeMarker(path.dirname(sourcePath), filename);
-  // FR-10.10 — archived, not deleted.
-  await moveTo(env.paths.archive, sourcePath, filename);
+  // FR-10.10 — a file is archived, not deleted.
+  await sink.settle();
   await notifyRecord(success ? 'SO_CREATED' : 'RECORD_FAILED', record.id);
   log.info({ filename, recordId: record.id, success }, 'result ingested');
+  return 'applied';
+}
+
+/**
+ * A result delivered over HTTPS (POST /api/integration/sap/results) rather than as a file.
+ * Same rules as a file, with the same idempotency: the call is named after what it says, so
+ * SAP sending the same answer twice is recognised and does nothing the second time.
+ */
+export async function ingestApiResult(parsed: ParsedResult): Promise<ApplyOutcome | 'duplicate'> {
+  const source = `api:${parsed.correlationId}:${parsed.attempt ?? 'x'}:${parsed.outcome}`;
+  if (await prisma.sapResult.findUnique({ where: { sourceFilename: source } })) return 'duplicate';
+
+  const content = JSON.stringify(parsed);
+  return applyResult(source, content, parsed, {
+    settle: async () => {},
+    unmatched: async (reason) => {
+      // FR-10.6 — never dropped: kept as a quarantined row and Operations is told.
+      await prisma.sapResult.create({
+        data: {
+          correlationId: parsed.correlationId,
+          outcome: 'ERROR',
+          rawContent: content,
+          sourceFilename: source,
+          quarantined: true,
+          quarantineReason: reason,
+          errorMessage: reason,
+        },
+      });
+      await writeAudit({ eventType: 'RESULT_QUARANTINED', message: `${source}: ${reason}`, actorName: 'sap-api' });
+      await notifyIntegration(`quarantine:${source}:${Date.now()}`, 'A SAP result could not be matched', `${source}: ${reason}`);
+    },
+  });
 }
 
 /** One sweep of the inbound folder. FR-10.1. */
@@ -377,7 +414,13 @@ export async function scanResultFolder(): Promise<number> {
         continue;
       }
 
-      await applyResult(filename, sourcePath, content, parsed);
+      await applyResult(filename, content, parsed, {
+        settle: async () => {
+          await removeMarker(path.dirname(sourcePath), filename);
+          await moveTo(env.paths.archive, sourcePath, filename);
+        },
+        unmatched: (reason) => quarantine(filename, sourcePath, content, reason, parsed.correlationId),
+      });
       processed++;
     } catch (err) {
       log.error({ filename, err: (err as Error).message }, 'failed to process result file');

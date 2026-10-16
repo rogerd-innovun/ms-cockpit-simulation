@@ -49,6 +49,8 @@ Segregation of duties is on by default (`SOD_REQUIRE_SEPARATE_APPROVER=true`), s
 
 **Uploading several POs at once:** select or drop up to 50 PDFs on the worklist. Each becomes its own record and is sent straight for extraction; a summary lists anything that was skipped, refused or left as a draft (for instance a PDF identical to one already in the system). Nothing reaches SAP until an approver approves it. One file still opens its draft first, so you can check it before publishing.
 
+**SAP calling the cockpit:** SAP can fetch its waiting orders and post back results over HTTPS instead of (or besides) the folders: [docs/04-sap-api.md](docs/04-sap-api.md) is the page to give the SAP team, and [DEPLOY.md](DEPLOY.md#letting-sap-call-the-cockpit-optional) says how to switch it on.
+
 **Dashboard:** the *Dashboard* link shows what the cockpit has done for the POs uploaded in the last 7, 30 or 90 days (or ever): POs processed, the share approved with no edits, time saved, what reviewers caught before SAP, what SAP rejected, how well it reads, and where the work sits now. Everything is counted from the audit trail except *time saved*, which is an estimate from stated assumptions (minutes to key a PO by hand versus to check it here) that you set in the `DASHBOARD_*` variables.
 
 **Notifications:** the bell shows what needs you, by role: approvers hear when a PO is ready for review, the uploader hears when their PO is sent back, rejected or becomes a Sales Order, and Operations hears about failures and integration problems. Each person chooses what they receive on the *Notifications* page. Email and a Microsoft Teams channel switch on with the `SMTP_*` and `NOTIFY_TEAMS_WEBHOOK_URL` variables — see [DEPLOY.md](DEPLOY.md#notifications-optional).

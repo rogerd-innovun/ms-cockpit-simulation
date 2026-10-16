@@ -71,6 +71,16 @@ const schema = z.object({
    * live: POSTed to SAP_LOG_API_URL. Endpoint, transport and auth are still to be
    * confirmed by the SAP team, so all of them are configuration.
    */
+  /**
+   * The SAP object the call goes to: ZEE_API_LOG, or whatever the SAP team points us at
+   * (ZEE_TEST_PROG for testing). It names the SOAP operation and labels the call on screen
+   * and in the audit trail. Restricted to what an ABAP name can hold, because it is written
+   * into XML.
+   */
+  SAP_LOG_API_NAME: z
+    .string()
+    .regex(/^[A-Za-z][A-Za-z0-9_]{0,29}$/, 'must be an SAP object name: letters, digits and underscores, up to 30')
+    .default('ZEE_API_LOG'),
   SAP_LOG_API_MODE: z.enum(['off', 'mock', 'live']).default('off'),
   SAP_LOG_API_URL: z.string().optional().default(''),
   /** json: {"IT_SALEORDERS":[{"VBELN":…}]} · soap: the function module's generated web service. */
@@ -146,6 +156,21 @@ const schema = z.object({
   NOTIFY_DELIVERY_POLL_MS: int(5000),
   /** An email or Teams message is tried this many times, with growing pauses, before it is given up on. */
   NOTIFY_MAX_ATTEMPTS: int(5),
+
+  // ---- FR-9.13 the HTTPS door for SAP: it calls us (GET /orders, POST /results) with this key.
+
+  /** At least 24 characters, random. Empty switches the SAP API off entirely. */
+  SAP_API_KEY: z.string().optional().default(''),
+  /** Comma-separated addresses or IPv4 ranges (103.44.1.206, 10.0.0.0/24). Empty allows any address. */
+  SAP_API_ALLOWED_IPS: z.string().optional().default(''),
+  /** The user name SAP puts in HTTP Basic login; the password is SAP_API_KEY. A Bearer or X-API-Key header needs no name. */
+  SAP_API_USER: z.string().optional().default('sap'),
+  /**
+   * How many proxies sit between the internet and this server, so the caller's real address
+   * is read from X-Forwarded-For (Render: 1). With the wrong value an address allow-list
+   * either blocks SAP or can be talked round, so it is set deliberately, never guessed.
+   */
+  TRUST_PROXY: int(0),
 });
 
 const parsed = schema.safeParse(process.env);

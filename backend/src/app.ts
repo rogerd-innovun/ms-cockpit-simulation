@@ -5,6 +5,8 @@ import { env } from './config/env.js';
 import { prisma } from './db/client.js';
 import { authRouter } from './modules/auth/routes.js';
 import { dashboardRouter } from './modules/dashboard/routes.js';
+import { sapApiRouter } from './modules/sapApi/routes.js';
+import { sapApiAuth } from './middleware/sapApiAuth.js';
 import { notificationsRouter } from './modules/notifications/routes.js';
 import { recordsRouter } from './modules/records/routes.js';
 import { sapLogRouter } from './modules/sapLog/routes.js';
@@ -17,6 +19,8 @@ const BOOT_TIME = new Date().toISOString();
 
 export function createApp() {
   const app = express();
+  // Behind a proxy (Render) the caller's address is in X-Forwarded-For; the allow-list for SAP needs it.
+  if (env.TRUST_PROXY > 0) app.set('trust proxy', env.TRUST_PROXY);
 
   app.use(
     helmet({
@@ -34,6 +38,9 @@ export function createApp() {
     }),
   );
   app.use(cors({ origin: env.CORS_ORIGIN.split(',').map((o) => o.trim()) }));
+  // Before the body is read: SAP's calls are checked for their key first, so an unauthorised caller
+  // gets "unauthorised" however malformed its body is (and a bad body from SAP gets a real parse error).
+  app.use('/api/integration/sap', sapApiAuth);
   app.use(express.json({ limit: '2mb' }));
 
   /** NFR-5.1 — health checks for the pieces that fail silently. */
@@ -73,6 +80,7 @@ export function createApp() {
   app.use('/api/auth', authRouter);
   app.use('/api/dashboard', dashboardRouter);
   app.use('/api/notifications', notificationsRouter);
+  app.use('/api/integration/sap', sapApiRouter);
   app.use('/api/records', sapLogRouter);
   app.use('/api/records', recordsRouter);
 

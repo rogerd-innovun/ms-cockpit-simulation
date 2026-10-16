@@ -124,6 +124,14 @@ If `EXTRACTION_PROVIDER=gemini` and no API key is set, the server refuses to sta
 
 The review pane uses the browser's built-in PDF viewer inside an `<iframe>`, which gives page navigation, zoom and text search for free. Per-field source highlighting (FR-7.4) needs bounding boxes the extractor does not currently return, and is deferred.
 
+### D-12 — SAP calls the cockpit (FR-9.13)
+
+Requested by the SAP team on 2026-10-05 ("create a URL in your cockpit so I can consume it in my SAP system"). It is a second door onto the same room, not a second implementation. `GET /api/integration/sap/orders` renders the same data as the CSV through the same conversion (`buildOutboundJson` beside `buildOutboundPayload`, one set of date and decimal rules). `POST /results` calls `ingestApiResult`, which runs the watcher's own `applyResult`: the code that decides whether an answer moves a record, is only kept as evidence, or completes a timed-out order is one function with two callers, differing only in what they tidy up afterwards (a file is archived, an HTTPS call has nothing to archive). Idempotency is the existing mechanism — the answer is named `api:<correlation>:<attempt>:<outcome>` and the unique source name makes a repeat a no-op.
+
+SAP is a machine, so it does not sign in as a user: one shared key (`SAP_API_KEY`, 24+ characters, compared in constant time against a hash), an optional address list (single addresses or IPv4 ranges, checked *before* the key so an unlisted address learns nothing), and a lockout after ten wrong keys in ten minutes. With no key set the whole API answers 503: off by default, like the other optional channels. Behind Render the caller's address comes from `X-Forwarded-For`, which is only honoured with `TRUST_PROXY` set to the number of proxies; with it unset an allow-list fails closed rather than trusting a header anyone can send.
+
+What this does not change: the folder exchange still works and the order file is still written when an order is approved. When real SAP is the one answering, the demo simulator must be off (`RUN_SAP_SIMULATOR=false`), or it answers first.
+
 ### D-9 — ZEE_API_LOG: one direct SAP call, keyed by Sales Order
 
 Added 2026-09-30 at the SAP team's request, and a deliberate exception to `IC-01`. It does not replace the folder drop, which still creates the order. The only contract given so far is table `IT_SALEORDERS` with field `VBELN` (CHAR10). The endpoint, transport, auth and response are all unconfirmed, so all of them are configuration (`SAP_LOG_API_*`, `SAP_CLIENT`), in the same spirit as D-3.
@@ -146,6 +154,10 @@ Added 2026-09-30 at the SAP team's request, and a deliberate exception to `IC-01
 | Writes on the SAP side? | not answered | Open. Decides whether the call may be repeated freely. |
 | Auth type / secret | not answered | Open. Basic auth is implemented; certificate or OAuth is not. |
 | Reachability (VPN / Cloud Connector) | not answered | Open. |
+
+**Which SAP object (2026-10-05).** The name is now `SAP_LOG_API_NAME` (default `ZEE_API_LOG`) rather than a constant, so the SAP team can point the same screen at another object — `ZEE_TEST_PROG` for testing — without a code change. It names the SOAP operation and labels the call on screen and in the audit trail; it is checked at start-up (letters, digits, underscores) because it is written into XML. The request body is still `IT_SALEORDERS` / `VBELN`, the only interface we know; if `ZEE_TEST_PROG` takes different parameters, the body will need adjusting.
+
+**What a connectivity check found (2026-10-05, from the developer's machine, no login).** The SAP system at 103.44.1.206 is an ABAP application server of instance number 28 (HTTP 8028, HTTPS 44328, RFC gateway 3328, dispatcher 3228) beside a HANA database web engine (8000); `/sap/public/ping` answers on both 8028 and 44328, and the kernel's realm names the system `TTA/800`. The HTTPS certificate is a wildcard for `*.mncinfosys.com` (valid to 2026-12-02), so the service has to be called by hostname, not by IP; there is no reverse-DNS entry, so the hostname is still to come from the SAP team. Plain ICF paths named after the object return 404; the `/sap/bc/srt` SOAP path returns 401 for any name, a made-up one included, because SAP asks for a login before it looks for the service — so whether `ZEE_TEST_PROG` exists is not yet known and needs the real path and the password.
 
 The reason the endpoint is held back rather than tried: in `live` mode the cockpit sends the user and password with every call, so a wrong host means handing an SAP login to whoever runs it. With `live` and no URL the server refuses to start, which is the intended state until the SAP team names the callable URL of `ZEE_API_LOG` itself (the SICF path or SOAMANAGER binding) and sends a sample request and response.
 
@@ -213,6 +225,7 @@ Implemented in `backend/prisma/schema.prisma`, following §7 of the requirements
 | `GET` | `/api/dashboard?days=7\|30\|90\|0` | FR-16 |
 | `GET` `POST` | `/api/notifications` · `/read` | FR-14 — the in-app inbox, and "mark all read" |
 | `GET` `PUT` | `/api/notifications/preferences` | FR-14.4 |
+| `GET` `POST` | `/api/integration/sap/…` | D-12 / FR-9.13 — key-protected, for SAP only: `ping`, `orders`, `orders/:id`, `results` |
 | `GET` `POST` | `/api/notifications/channels` · `/test` | FR-14.8 — channel status (booleans and counts only) / admin test |
 
 Errors return `{ error: { code, message, details } }`. `code` is stable for the UI; `message` names the field and the remedy (NFR-4.3). An unexpected error is the exception: its message is only a reference number, and the cause is in the server log under that reference.

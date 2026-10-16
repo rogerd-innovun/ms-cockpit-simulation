@@ -399,6 +399,12 @@ Acceptance criteria use EARS phrasing (`WHEN <trigger> THE SYSTEM SHALL <respons
 
 ---
 
+### FR-9.13 — HTTPS exchange with SAP
+
+WHERE the SAP team prefers to call the cockpit rather than poll a folder, THE SYSTEM SHALL offer an HTTPS API with the same content and the same rules as the folder exchange (`docs/04-sap-api.md`): a list of the approved orders SAP has not yet answered, in the CSV's date and number formats; and a call to post a result, which SHALL be handled exactly as a result file is (`FR-10.4` to `FR-10.9`, including a late answer, an answer for a superseded attempt, and reposting the same answer). The API SHALL be off unless a key is configured, SHALL require that key on every call, MAY be limited to listed addresses, SHALL slow down an address that keeps sending wrong keys, and SHALL alert Operations to an answer that matches no order.
+
+---
+
 ### FR-10 — SAP result ingestion
 
 **User story:** As an Uploader, I want to see whether SAP actually created the order, so that I know when to act.

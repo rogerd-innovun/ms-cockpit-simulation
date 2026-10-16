@@ -71,6 +71,13 @@ services:
       - key: SAP_SIM_FAILURE_RATE
         value: "0"           # nothing is rejected; set e.g. 0.15 to exercise the failure path
 
+      # ---- the HTTPS API for SAP (FR-9.13), see docs/04-sap-api.md ----
+      # Render's proxy is one hop away; without this an address allow-list sees only the proxy.
+      # Add SAP_API_KEY (a long random secret) and SAP_API_ALLOWED_IPS (SAP's public address) in the
+      # dashboard when SAP is ready to call. With no SAP_API_KEY the API is off.
+      - key: TRUST_PROXY
+        value: "1"
+
       # ---- notifications (FR-14) ----
       # The in-app bell needs nothing. This is the address in the "Open" links of emails and
       # Teams messages. To switch on email or Teams, add these in the Render dashboard
