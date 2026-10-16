@@ -1,0 +1,209 @@
+backend/src/middleware/sapApiAuth.ts
+  s_5f5f3ef2604517::t_f593b41c4298a2 1-42,48-50,57-80,85-104,116-117,119-120
+  s_5f5f3ef2604517::t_263b607bc39918 43-47,51-56,81-84,105-115,118
+README.md
+  s_5f5f3ef2604517::t_052b131a82ede9 52-53
+backend/src/middleware/sapApiAuth.test.ts
+  s_5f5f3ef2604517::t_6653805372125d 11,125-194
+  s_5f5f3ef2604517::t_ea3a431f43041b 1-10,12-124,195-196
+backend/src/modules/sapLog/routes.ts
+  s_5f5f3ef2604517::t_e2facd271aef65 7,11-12,41,49,73,89
+backend/src/server.ts
+  s_5f5f3ef2604517::t_e2facd271aef65 29
+  s_5f5f3ef2604517::t_569103dc918acb 35-37,39-43,46
+  s_5f5f3ef2604517::t_044107b4195a42 38
+docs/01-requirements.md
+  s_5f5f3ef2604517::t_052b131a82ede9 402-407
+backend/src/services/sap/resultWatcher.ts
+  s_5f5f3ef2604517::t_a8cfa27ff0040c 199-213,218-219,226-227,243,246,259-260,274,277,321-322,325-356,417-423
+backend/src/services/sap/logApi.test.ts
+  s_5f5f3ef2604517::t_e2facd271aef65 51,81-112
+  s_5f5f3ef2604517::t_89c10e40fc559c 72
+backend/src/services/sap/csv.ts
+  s_5f5f3ef2604517::t_a8cfa27ff0040c 198-241
+backend/src/config/env.ts
+  s_5f5f3ef2604517::t_e2facd271aef65 74-83
+  s_5f5f3ef2604517::t_263b607bc39918 166-167
+  s_5f5f3ef2604517::t_569103dc918acb 159-165,168-173
+.env.example
+  s_5f5f3ef2604517::t_e2facd271aef65 53-54
+  s_5f5f3ef2604517::t_052b131a82ede9 70-74,77-79
+  s_5f5f3ef2604517::t_8193feb78cc535 75-76
+DEPLOY.md
+  s_5f5f3ef2604517::t_052b131a82ede9 181-187,189-191
+  s_5f5f3ef2604517::t_8193feb78cc535 188
+docs/04-sap-api.md
+  s_5f5f3ef2604517::t_8193feb78cc535 9,92,109
+  s_5f5f3ef2604517::t_4a1780a6b76b1b 1-8,10-91,93-108
+render.yaml
+  s_5f5f3ef2604517::t_052b131a82ede9 74-80
+docs/02-design.md
+  s_5f5f3ef2604517::t_052b131a82ede9 127-134,228
+  s_5f5f3ef2604517::t_3c6f924ce0e0fd 158-161
+backend/src/services/sap/logApi.ts
+  s_5f5f3ef2604517::t_e2facd271aef65 2-3,5,25-26,38,51,71,85,146,148,151
+backend/src/app.ts
+  s_5f5f3ef2604517::t_263b607bc39918 9,41-43
+  s_5f5f3ef2604517::t_893b3b4b28e890 8
+  s_5f5f3ef2604517::t_569103dc918acb 83
+  s_5f5f3ef2604517::t_c46b20c25a7a84 22-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "1.6.9",
+  "base_commit_sha": "4db6660a35fd74158a2eb13dcc375eaac0411aba",
+  "branch": "qa-sweep-fixes-and-sap-log",
+  "prompts": {
+    "s_5f5f3ef2604517": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0f0f0f4-ee83-4844-afe9-c313999885dc",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:3adf5b1af00e5e8430e39161c33f3a6ce58d14fdea72381d5a7365ab2ac02098",
+      "total_additions": 1010,
+      "total_deletions": 53,
+      "accepted_lines": 686,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_ecb1cf07284e37": {
+      "author": "Roger D <roger.d@innovunglobal.com>"
+    }
+  },
+  "sessions": {
+    "s_5f5f3ef2604517": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0f0f0f4-ee83-4844-afe9-c313999885dc",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Roger D <roger.d@innovunglobal.com>",
+      "messages_url": "cas:3adf5b1af00e5e8430e39161c33f3a6ce58d14fdea72381d5a7365ab2ac02098",
+      "stats": {
+        "total_additions": 1010,
+        "total_deletions": 53,
+        "accepted_lines": 686,
+        "overriden_lines": 0,
+        "files": {
+          ".env.example": {
+            "total_additions": 12,
+            "total_deletions": 0,
+            "accepted_lines": 12,
+            "overriden_lines": 0
+          },
+          "DEPLOY.md": {
+            "total_additions": 12,
+            "total_deletions": 1,
+            "accepted_lines": 11,
+            "overriden_lines": 0
+          },
+          "README.md": {
+            "total_additions": 2,
+            "total_deletions": 0,
+            "accepted_lines": 2,
+            "overriden_lines": 0
+          },
+          "backend/src/app.ts": {
+            "total_additions": 9,
+            "total_deletions": 1,
+            "accepted_lines": 8,
+            "overriden_lines": 0
+          },
+          "backend/src/config/env.ts": {
+            "total_additions": 25,
+            "total_deletions": 0,
+            "accepted_lines": 25,
+            "overriden_lines": 0
+          },
+          "backend/src/middleware/sapApiAuth.test.ts": {
+            "total_additions": 199,
+            "total_deletions": 3,
+            "accepted_lines": 196,
+            "overriden_lines": 0
+          },
+          "backend/src/middleware/sapApiAuth.ts": {
+            "total_additions": 123,
+            "total_deletions": 3,
+            "accepted_lines": 120,
+            "overriden_lines": 0
+          },
+          "backend/src/modules/integration/routes.test.ts": {
+            "total_additions": 180,
+            "total_deletions": 0,
+            "accepted_lines": 0,
+            "overriden_lines": 0
+          },
+          "backend/src/modules/integration/routes.ts": {
+            "total_additions": 131,
+            "total_deletions": 0,
+            "accepted_lines": 0,
+            "overriden_lines": 0
+          },
+          "backend/src/modules/sapLog/routes.ts": {
+            "total_additions": 7,
+            "total_deletions": 6,
+            "accepted_lines": 7,
+            "overriden_lines": 0
+          },
+          "backend/src/server.ts": {
+            "total_additions": 13,
+            "total_deletions": 3,
+            "accepted_lines": 11,
+            "overriden_lines": 0
+          },
+          "backend/src/services/sap/csv.ts": {
+            "total_additions": 44,
+            "total_deletions": 0,
+            "accepted_lines": 44,
+            "overriden_lines": 0
+          },
+          "backend/src/services/sap/logApi.test.ts": {
+            "total_additions": 37,
+            "total_deletions": 1,
+            "accepted_lines": 37,
+            "overriden_lines": 0
+          },
+          "backend/src/services/sap/logApi.ts": {
+            "total_additions": 12,
+            "total_deletions": 9,
+            "accepted_lines": 12,
+            "overriden_lines": 0
+          },
+          "backend/src/services/sap/resultWatcher.ts": {
+            "total_additions": 66,
+            "total_deletions": 23,
+            "accepted_lines": 66,
+            "overriden_lines": 0
+          },
+          "docs/01-requirements.md": {
+            "total_additions": 6,
+            "total_deletions": 0,
+            "accepted_lines": 6,
+            "overriden_lines": 0
+          },
+          "docs/02-design.md": {
+            "total_additions": 13,
+            "total_deletions": 0,
+            "accepted_lines": 13,
+            "overriden_lines": 0
+          },
+          "docs/04-sap-api.md": {
+            "total_additions": 112,
+            "total_deletions": 3,
+            "accepted_lines": 109,
+            "overriden_lines": 0
+          },
+          "render.yaml": {
+            "total_additions": 7,
+            "total_deletions": 0,
+            "accepted_lines": 7,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  }
+}
