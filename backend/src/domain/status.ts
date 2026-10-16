@@ -18,7 +18,11 @@ export const TRANSITIONS: Record<POStatus, readonly POStatus[]> = {
   APPROVED: ['SENT_TO_SAP', 'NEEDS_REVIEW'],
   SENT_TO_SAP: ['SO_CREATED', 'FAILED'],
   SO_CREATED: [], // INV-02 — terminal
-  FAILED: ['NEEDS_REVIEW'],
+  // FAILED → SO_CREATED is not an action anyone can take. It is how a record leaves FAILED
+  // when it was only marked so because SAP was slow (FR-10.5) and SAP then answered
+  // "created" for that same attempt: the result file is the fact, the timeout was a guess.
+  // Only the result watcher makes this move, and only from NO_RESPONSE_FROM_SAP.
+  FAILED: ['NEEDS_REVIEW', 'SO_CREATED'],
   CANCELLED: [], // INV-02 — terminal
 } as const;
 

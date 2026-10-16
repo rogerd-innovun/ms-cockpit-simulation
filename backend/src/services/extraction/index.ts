@@ -16,6 +16,7 @@ import { writeAudit } from '../audit.js';
 import { loadDocumentContent } from '../storage.js';
 import { GeminiExtractionProvider } from './gemini.js';
 import { MockExtractionProvider } from './mock.js';
+import { notifyRecord } from '../notifications/notify.js';
 import { GENERIC_EXTRACTION_PROMPT, GENERIC_PROMPT_VERSION, buildVendorPrompt } from './prompts.js';
 import { ExtractionError, type ExtractionProvider } from './types.js';
 
@@ -120,6 +121,7 @@ export async function runExtractionForRecord(recordId: string): Promise<void> {
       message: 'PROCESSING → EXTRACTION_FAILED',
       actorName: 'extraction-worker',
     });
+    await notifyRecord('EXTRACTION_FAILED', recordId, { detail: message });
     log.error({ recordId }, 'source document missing from disk and database');
     return;
   }
@@ -201,6 +203,9 @@ export async function runExtractionForRecord(recordId: string): Promise<void> {
         message: 'PROCESSING → NEEDS_REVIEW',
         actorName: 'extraction-worker',
       });
+      // FR-14.1 — the approvers' cue. notifyRecord cannot throw, so a mail server that is down
+      // can never be mistaken here for a failed extraction and send this round again.
+      await notifyRecord('REVIEW_NEEDED', recordId);
       log.info({ recordId, attempt, tries }, 'extraction succeeded');
       return;
     } catch (err) {
@@ -243,6 +248,7 @@ export async function runExtractionForRecord(recordId: string): Promise<void> {
     message: 'PROCESSING → EXTRACTION_FAILED',
     actorName: 'extraction-worker',
   });
+  await notifyRecord('EXTRACTION_FAILED', recordId, { detail: message });
   log.error({ recordId, message }, 'extraction failed');
 }
 

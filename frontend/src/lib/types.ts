@@ -197,8 +197,92 @@ export interface RecordDetail {
   }[];
   /** FR-7.12 — set while the record is back in review because an approver sent it back. */
   sentBack?: { reason: string; by: string; at: string } | null;
+  /** Sales Orders SAP reports creating that this record is not linked to (a late or superseded answer). */
+  unlinkedOrders?: { soNumber: string; attempt: number | null; ingestedAt: string; sapTimestamp: string | null }[];
   allowedTransitions: POStatus[];
   statusLabel: string;
+}
+
+export type NotificationKind =
+  | 'REVIEW_NEEDED'
+  | 'SENT_BACK'
+  | 'RECORD_FAILED'
+  | 'EXTRACTION_FAILED'
+  | 'SO_CREATED'
+  | 'INTEGRATION_ALERT';
+
+export interface NotificationItem {
+  id: string;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  recordId: string | null;
+  createdAt: string;
+  /** Arrived since the user last pressed "Mark all read". */
+  unread: boolean;
+}
+
+export interface Inbox {
+  unread: number;
+  items: NotificationItem[];
+}
+
+export interface NotificationPreference {
+  kind: NotificationKind;
+  label: string;
+  description: string;
+  inApp: boolean;
+  email: boolean;
+}
+
+export interface ChannelStats {
+  sent: number;
+  pending: number;
+  failed: number;
+  lastError: string | null;
+}
+
+export interface ChannelStatus {
+  email: { configured: boolean; redirected: boolean };
+  teams: { configured: boolean; kinds: string[] };
+  /** Only for Operations and Administrators. */
+  recent: { email: ChannelStats; teams: ChannelStats } | null;
+}
+
+/** GET /api/dashboard — see backend/src/domain/dashboard.ts for what each figure means. */
+export interface DashboardData {
+  generatedAt: string;
+  /** 0 means all time. */
+  periodDays: number;
+  uploaded: number;
+  read: number;
+  approved: number;
+  soCreated: number;
+  straightThrough: { count: number; of: number; rate: number | null };
+  minutesSaved: {
+    total: number;
+    perPo: number | null;
+    assumptions: {
+      manualMinutesPerPo: number;
+      manualMinutesPerLine: number;
+      reviewMinutesPerPo: number;
+      reviewMinutesPerLine: number;
+      minutesPerCorrection: number;
+    };
+  };
+  caught: {
+    recordsIntercepted: number;
+    sentBack: number;
+    recordsSentBack: number;
+    corrections: number;
+    recordsCorrected: number;
+    warningsAccepted: number;
+  };
+  sapRejections: { total: number; recordsRejected: number; recovered: number; byCode: { code: string; count: number }[] };
+  quality: { fieldsRead: number; fieldsCorrected: number; accuracy: number | null; avgConfidence: number | null };
+  turnaround: { medianMinutes: number | null; of: number };
+  daily: { date: string; uploaded: number; soCreated: number }[];
+  pipeline: Record<string, number>;
 }
 
 export interface WorklistRow {

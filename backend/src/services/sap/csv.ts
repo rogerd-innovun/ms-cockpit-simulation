@@ -195,6 +195,50 @@ export function buildOutboundPayload(
   };
 }
 
+/**
+ * The same order as buildOutboundPayload writes it, for the HTTPS API (GET /api/integration/sap/orders).
+ * Dates and numbers go through the same conversion and the same CSV_DATE_FORMAT /
+ * CSV_DECIMAL_SEPARATOR settings, so what SAP reads over HTTPS and what it would read from
+ * the file are one and the same, and a value that cannot be converted fails the same way.
+ */
+export function buildOutboundJson(
+  correlationId: string,
+  attempt: number,
+  header: HeaderWithLines,
+  fmt: CsvFormat = envFormat(),
+) {
+  const lines = [...header.lineItems].sort((a, b) => a.lineNumber - b.lineNumber);
+  return {
+    correlationId,
+    attempt,
+    header: {
+      poNumber: header.poNumber,
+      poDate: asDate(header.poDate, 'PO date', fmt),
+      customerCode: header.customerCode,
+      customerName: header.customerName,
+      shipTo: header.shipTo,
+      billTo: header.billTo,
+      currency: header.currency?.trim().toUpperCase() ?? null,
+      requestedDeliveryDate: asDate(header.requestedDeliveryDate, 'Requested delivery date', fmt),
+      paymentTerms: header.paymentTerms,
+      incoterms: header.incoterms,
+      poTotalValue: asDecimal(header.poTotalValue, 'PO total value', fmt),
+    },
+    lines: lines.map((l) => ({
+      lineNumber: l.lineNumber,
+      materialCode: l.materialCode,
+      customerMaterialNumber: l.customerMaterialNumber,
+      description: l.description,
+      quantity: asDecimal(l.quantity, `Line ${l.lineNumber} quantity`, fmt),
+      uom: l.uom,
+      unitPrice: asDecimal(l.unitPrice, `Line ${l.lineNumber} unit price`, fmt),
+      lineNetValue: asDecimal(l.lineNetValue, `Line ${l.lineNumber} net value`, fmt),
+      deliveryDate: asDate(l.deliveryDate, `Line ${l.lineNumber} delivery date`, fmt),
+      plant: l.plant,
+    })),
+  };
+}
+
 /** FR-8.3 — the correlation ID is in the filename as well as the content. */
 export const outboundBaseName = (correlationId: string, attempt: number) =>
   `PO_${correlationId}_${attempt}`;

@@ -10,6 +10,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { LifecycleRail } from '../components/LifecycleRail';
 import { SapLogPanel } from '../components/SapLogPanel';
 import { statusLabel } from '../lib/status';
+import { worklistHref } from '../lib/worklistState';
 import type { FieldProvenance, RecordDetail } from '../lib/types';
 
 const HEADER_LAYOUT: { key: string; label: string; full?: boolean }[] = [
@@ -195,12 +196,25 @@ export function RecordPage() {
     />
   );
 
+  /**
+   * Approve, then open the oldest record still waiting for review. Working through a batch
+   * of freshly extracted POs is one click per order instead of three. When nothing else is
+   * waiting, it returns to the list as it was left.
+   */
+  const approveAndNext = () =>
+    mutate.mutate(() => api.approve(id), {
+      onSuccess: async () => {
+        const next = await api.nextForReview(id).catch(() => null);
+        navigate(next ? `/records/${next}` : worklistHref());
+      },
+    });
+
   return (
     <div className="sheet">
       <div className="rec-head">
         <div style={{ minWidth: 0 }}>
           <div className="rec-meta">
-            <Link to="/">Worklist</Link>
+            <Link to={worklistHref()}>Worklist</Link>
             <StatusBadge status={r.status} />
             {r.currentAttempt > 0 && <span className="cap">attempt {r.currentAttempt}</span>}
             {r.vendorProfile ? (
@@ -225,8 +239,9 @@ export function RecordPage() {
           canApprove={canApprove}
           isOwnUpload={isOwnUpload}
           onAction={(op) => mutate.mutate(op)}
+          onApproveNext={approveAndNext}
           onReject={() => setShowReject((s) => !s)}
-          onDeleted={() => navigate('/')}
+          onDeleted={() => navigate(worklistHref())}
         />
       </div>
 
@@ -398,11 +413,7 @@ export function RecordPage() {
           </div>
         </div>
       ) : (
-        <div className="empty">
-          {r.status === 'PROCESSING' || r.status === 'PUBLISHED'
-            ? 'Extraction is running…'
-            : 'No extracted data on this record.'}
-        </div>
+        <NoReadingView d={d} />
       )}
 
       {walk.length > 0 && (
@@ -479,13 +490,14 @@ function QualityStrip({
 }
 
 function Actions({
-  d, busy, canApprove, isOwnUpload, onAction, onReject, onDeleted,
+  d, busy, canApprove, isOwnUpload, onAction, onApproveNext, onReject, onDeleted,
 }: {
   d: RecordDetail;
   busy: boolean;
   canApprove: boolean;
   isOwnUpload: boolean;
   onAction: (op: () => Promise<RecordDetail>) => void;
+  onApproveNext: () => void;
   onReject: () => void;
   onDeleted: () => void;
 }) {
@@ -493,6 +505,16 @@ function Actions({
   const id = r.id;
   const blocked = d.validation.blockingCount > 0;
   const toAccept = d.validation.issues.filter((i) => i.severity === 'WARNING' && !i.acknowledged).length;
+  const cannotApprove = busy || blocked || toAccept > 0 || !canApprove || isOwnUpload;
+  const approveTitle = !canApprove
+    ? 'Your role cannot approve records.'
+    : isOwnUpload
+      ? 'Segregation of duties: this record must be approved by someone else.'
+      : blocked
+        ? `${d.validation.blockingCount} blocking issue(s) must be fixed first.`
+        : toAccept > 0
+          ? `${toAccept} warning(s) must be accepted first — check each against the PDF.`
+          : undefined;
 
   return (
     <div className="actions">
@@ -527,19 +549,16 @@ function Actions({
             Send back
           </button>
           <button
+            disabled={cannotApprove}
+            title={approveTitle ?? 'Approve and send to SAP, then open the next record waiting for review'}
+            onClick={onApproveNext}
+          >
+            Approve &amp; next
+          </button>
+          <button
             className="primary"
-            disabled={busy || blocked || toAccept > 0 || !canApprove || isOwnUpload}
-            title={
-              !canApprove
-                ? 'Your role cannot approve records.'
-                : isOwnUpload
-                  ? 'Segregation of duties: this record must be approved by someone else.'
-                  : blocked
-                    ? `${d.validation.blockingCount} blocking issue(s) must be fixed first.`
-                    : toAccept > 0
-                      ? `${toAccept} warning(s) must be accepted first — check each against the PDF.`
-                      : 'Approve and send to SAP'
-            }
+            disabled={cannotApprove}
+            title={approveTitle ?? 'Approve and send to SAP'}
             onClick={() => onAction(() => api.approve(id))}
           >
             Approve &amp; send to SAP
@@ -560,6 +579,9 @@ function Actions({
   );
 }
 
+/** The most recent audit event of a kind (the trail is oldest-first). */
+const lastEvent = (d: RecordDetail, eventType: string) => [...d.audit].reverse().find((a) => a.eventType === eventType);
+
 function Notices({ d }: { d: RecordDetail }) {
   const r = d.record;
   // Defence in depth: a response that omits `duplicates` used to throw here and
@@ -572,7 +594,12 @@ function Notices({ d }: { d: RecordDetail }) {
     ? (d.documentDuplicates ?? [])
     : [];
   const docDupAtSap = docDups.some((x) => x.status === 'SENT_TO_SAP' || x.status === 'SO_CREATED');
+  const unlinked = d.unlinkedOrders ?? [];
+  const cancelled = lastEvent(d, 'RECORD_CANCELLED');
+  const extractionFailure = lastEvent(d, 'EXTRACTION_FAILED');
   const any =
+    unlinked.length > 0 ||
+    r.status === 'CANCELLED' ||
     r.status === 'SO_CREATED' ||
     (r.status === 'FAILED' && d.failure) ||
     r.status === 'EXTRACTION_FAILED' ||
@@ -585,6 +612,25 @@ function Notices({ d }: { d: RecordDetail }) {
 
   return (
     <div className="notice-stack">
+      {unlinked.length > 0 && (
+        <div className="notice t-crit">
+          <b>
+            SAP created {unlinked.length === 1 ? 'a Sales Order' : `${unlinked.length} Sales Orders`} that this
+            record is not linked to
+          </b>
+          {unlinked.map((u) => (
+            <span key={u.soNumber}>
+              Sales Order <b>{u.soNumber}</b> &mdash; SAP&rsquo;s answer to attempt {u.attempt ?? '?'}, received{' '}
+              {new Date(u.ingestedAt).toLocaleString()}
+            </span>
+          ))}
+          <span>
+            {r.status === 'SO_CREATED'
+              ? `This record's own order is ${r.soNumber}, so the one above is probably a duplicate to cancel in SAP.`
+              : 'Approving this record sends SAP another order. Check what already exists in SAP first.'}
+          </span>
+        </div>
+      )}
       {docDups.length > 0 && (
         <div className={`notice ${docDupAtSap ? 't-crit' : 't-warn'}`}>
           <b>
@@ -630,6 +676,19 @@ function Notices({ d }: { d: RecordDetail }) {
         <div className="notice t-crit">
           <b>Extraction could not complete</b>
           <span>Retry it, or enter the data by hand. Nothing has been sent to SAP.</span>
+          {extractionFailure?.message && <span className="raw">{extractionFailure.message}</span>}
+        </div>
+      )}
+      {r.status === 'CANCELLED' && (
+        <div className="notice">
+          <b>Cancelled</b>
+          <span>
+            {cancelled
+              ? `${cancelled.actor?.name ?? cancelled.actorName ?? 'Someone'}, ${new Date(cancelled.timestamp).toLocaleString()}`
+              : 'This record was cancelled.'}
+          </span>
+          {cancelled?.message && <span>{cancelled.message}</span>}
+          <span>The PDF and the audit trail are retained.</span>
         </div>
       )}
       {r.status === 'SENT_TO_SAP' && (
@@ -677,6 +736,46 @@ function Notices({ d }: { d: RecordDetail }) {
           </span>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * A record with nothing extracted: cancelled before it was read, still being read, or
+ * extraction failed. The document and the history matter most here (FR-1.9, FR-13.4) —
+ * it is where someone has to decide what to do with the file, or find out what happened
+ * to it — so they are shown beside the notice rather than replaced by it.
+ */
+function NoReadingView({ d }: { d: RecordDetail }) {
+  const r = d.record;
+  const reading = r.status === 'PUBLISHED' || r.status === 'PROCESSING';
+  return (
+    <div className="split" style={{ ['--split' as string]: '42%' }}>
+      {r.sourceDocument ? <PdfPane recordId={r.id} filename={r.sourceDocument.originalFilename} /> : <div />}
+      <div />
+      <div className="reading">
+        {reading && (
+          <div className="notice t-info">
+            <b>Extraction is running…</b>
+            <span>The PDF is being read. This page updates itself when it is done.</span>
+          </div>
+        )}
+        {!reading && r.status !== 'EXTRACTION_FAILED' && r.status !== 'CANCELLED' && (
+          <div className="empty">No extracted data on this record.</div>
+        )}
+        {r.sourceDocument && (
+          <section className="sec">
+            <div className="sec-head"><h2>Document</h2></div>
+            <dl className="kv">
+              <dt>File</dt><dd>{r.sourceDocument.originalFilename}</dd>
+              <dt>Pages</dt><dd>{r.sourceDocument.pageCount ?? 'unknown'}</dd>
+              <dt>Uploaded by</dt><dd>{r.uploadedBy.name}</dd>
+              <dt>Correlation id</dt><dd className="mono">{r.correlationId}</dd>
+            </dl>
+          </section>
+        )}
+        <History d={d} />
+      </div>
     </div>
   );
 }

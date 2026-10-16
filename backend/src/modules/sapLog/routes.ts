@@ -4,11 +4,12 @@ import { prisma } from '../../db/client.js';
 import { AppError, badRequest, conflict, notFound } from '../../lib/errors.js';
 import { requireAuth } from '../../middleware/auth.js';
 import { writeAudit } from '../../services/audit.js';
-import { LOG_API_NAME, callLogApi, logApiConfig } from '../../services/sap/logApi.js';
+import { callLogApi, logApiConfig } from '../../services/sap/logApi.js';
 import { VbelnError, toVbeln } from '../../services/sap/vbeln.js';
 
 /**
- * ZEE_API_LOG for one record: its Sales Order number goes to SAP as IT_SALEORDERS-VBELN.
+ * The SAP log API (ZEE_API_LOG, or the object named in SAP_LOG_API_NAME) for one record: its Sales
+ * Order number goes to SAP as IT_SALEORDERS-VBELN.
  *
  * Every call is written to the audit trail with the request and SAP's answer, so the
  * history of what was asked and what came back survives without a table of its own.
@@ -37,7 +38,7 @@ function vbelnOf(soNumber: string | null) {
 sapLogRouter.get('/:id/sap-log', requireAuth, async (req, res, next) => {
   try {
     const record = await loadRecord(req.params.id!);
-    const { mode, format } = logApiConfig();
+    const { name, mode, format } = logApiConfig();
     const events = await prisma.auditEvent.findMany({
       where: { recordId: record.id, eventType: 'SAP_LOG_API_CALLED' },
       orderBy: { timestamp: 'desc' },
@@ -45,7 +46,7 @@ sapLogRouter.get('/:id/sap-log', requireAuth, async (req, res, next) => {
       include: { actor: { select: { name: true } } },
     });
     res.json({
-      api: LOG_API_NAME,
+      api: name,
       mode,
       format,
       soNumber: record.soNumber,
@@ -69,7 +70,7 @@ sapLogRouter.post('/:id/sap-log', requireAuth, async (req, res, next) => {
     if (cfg.mode === 'off') {
       throw new AppError(
         503,
-        `${LOG_API_NAME} is switched off. Set SAP_LOG_API_MODE to mock or live in backend/.env.`,
+        `${cfg.name} is switched off. Set SAP_LOG_API_MODE to mock or live in backend/.env.`,
         'SAP_LOG_API_OFF',
       );
     }
@@ -85,7 +86,7 @@ sapLogRouter.post('/:id/sap-log', requireAuth, async (req, res, next) => {
       recordId: record.id,
       eventType: 'SAP_LOG_API_CALLED',
       actorId: req.user!.id,
-      message: `${LOG_API_NAME} (${cfg.mode}) for VBELN ${vbeln}: ${
+      message: `${cfg.name} (${cfg.mode}) for VBELN ${vbeln}: ${
         call.ok ? `HTTP ${call.httpStatus}` : (call.error ?? 'failed')
       }`,
       after: call as unknown as Prisma.InputJsonValue,

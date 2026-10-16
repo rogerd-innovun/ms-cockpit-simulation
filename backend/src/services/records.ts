@@ -4,6 +4,7 @@ import { prisma } from '../db/client.js';
 import { markAcknowledged } from '../domain/acknowledgement.js';
 import { deriveSentBack } from '../domain/sentBack.js';
 import { assertTransition, isEditable } from '../domain/status.js';
+import { unlinkedOrders } from '../domain/unlinkedOrders.js';
 import {
   HEADER_FIELDS,
   LINE_FIELDS,
@@ -17,6 +18,7 @@ import { badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
 import { correlationIdFor, newRecordId } from '../lib/ids.js';
 import { childLogger } from '../lib/logger.js';
 import { writeAudit } from './audit.js';
+import { notifyRecord } from './notifications/notify.js';
 import { mapSapError } from './sap/errorMap.js';
 import { submitToSap } from './sap/outbound.js';
 import { deleteDocument, looksLikePdf, storeDocument } from './storage.js';
@@ -612,6 +614,12 @@ export async function rejectRecord(actor: Actor, recordId: string, reason: strin
     where: { id: recordId },
     data: { statusChangedAt: new Date() },
   });
+  // FR-14 — the uploader hears why. Sending back leaves the status alone, so each one needs
+  // its own key or only the first would ever be announced.
+  await notifyRecord('SENT_BACK', recordId, {
+    detail: `${actor.name} sent it back: ${reason.trim()}`,
+    suffix: String(Date.now()),
+  });
   return getRecordDetail(recordId);
 }
 
@@ -634,6 +642,10 @@ export async function resubmitRecord(actor: Actor, recordId: string) {
     eventType: 'STATUS_CHANGED',
     message: `${record.status} → NEEDS_REVIEW`,
     actorId: actor.id,
+  });
+  // FR-14.1 — corrected after a rejection, so it is the approvers' turn again.
+  await notifyRecord('REVIEW_NEEDED', recordId, {
+    detail: `Returned for review after ${record.failureCode ?? 'a failure'}.`,
   });
   return getRecordDetail(recordId);
 }
@@ -809,6 +821,8 @@ export async function getRecordDetail(recordId: string) {
     audit,
     failure: mapSapError(record.failureCode, record.failureMessage),
     sentBack: deriveSentBack(record.status, audit),
+    // Orders SAP says it created that this record is not linked to (a late or superseded answer).
+    unlinkedOrders: unlinkedOrders(record.soNumber, results),
     permissions: null as null | Record<string, boolean>,
   };
 }

@@ -48,6 +48,7 @@ beforeAll(async () => {
 afterAll(() => new Promise<void>((r) => server.close(() => r())));
 
 const cfg = (over: Partial<LogApiConfig> = {}): LogApiConfig => ({
+  name: 'ZEE_API_LOG',
   mode: 'live',
   url: `${base}/sap/bc/zee_api_log`,
   format: 'json',
@@ -68,12 +69,47 @@ describe('ZEE_API_LOG request shape', () => {
   });
 
   it('SOAP: the function-module envelope with IT_SALEORDERS/item/VBELN', () => {
-    const { body, headers } = buildLogApiRequest(['4500123456'], 'soap');
+    const { body, headers } = buildLogApiRequest(['4500123456'], 'soap', 'ZEE_API_LOG');
     expect(headers['Content-Type']).toMatch(/^text\/xml/);
     expect(body).toContain('xmlns:urn="urn:sap-com:document:sap:rfc:functions"');
     expect(body).toContain(
       '<urn:ZEE_API_LOG><IT_SALEORDERS><item><VBELN>4500123456</VBELN></item></IT_SALEORDERS></urn:ZEE_API_LOG>',
     );
+  });
+});
+
+describe('a different SAP object (SAP_LOG_API_NAME)', () => {
+  it('SOAP: names the operation after it, and nothing else about the body changes', () => {
+    const { body } = buildLogApiRequest(['4500123456'], 'soap', 'ZEE_TEST_PROG');
+    expect(body).toContain(
+      '<urn:ZEE_TEST_PROG><IT_SALEORDERS><item><VBELN>4500123456</VBELN></item></IT_SALEORDERS></urn:ZEE_TEST_PROG>',
+    );
+    expect(body).not.toContain('ZEE_API_LOG');
+  });
+
+  it('JSON: the same IT_SALEORDERS body, whatever the object is called', () => {
+    expect(JSON.parse(buildLogApiRequest(['4500123456'], 'json', 'ZEE_TEST_PROG').body)).toEqual({
+      IT_SALEORDERS: [{ VBELN: '4500123456' }],
+    });
+  });
+
+  it('labels the recorded call with the name it was made to', async () => {
+    const call = await callLogApi(['4500123456'], cfg({ name: 'ZEE_TEST_PROG', mode: 'mock', url: '' }));
+    expect(call.api).toBe('ZEE_TEST_PROG');
+  });
+
+  it('refuses to start with a name that is not an SAP object name, since it is written into XML', async () => {
+    const run = async (name: string) => {
+      process.env.SAP_LOG_API_NAME = name;
+      process.env.DATABASE_URL ??= 'postgresql://x';
+      const { vi } = await import('vitest');
+      vi.resetModules();
+      return import('../../config/env.js');
+    };
+    await expect(run('ZEE_TEST_PROG')).resolves.toBeDefined();
+    await expect(run('ZEE</urn><evil>')).rejects.toThrow(/SAP_LOG_API_NAME/);
+    await expect(run('1BAD')).rejects.toThrow(/SAP_LOG_API_NAME/);
+    delete process.env.SAP_LOG_API_NAME;
   });
 });
 

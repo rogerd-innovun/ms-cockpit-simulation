@@ -26,14 +26,24 @@ function assertSapLogApiConfigured() {
   if (env.SAP_LOG_API_MODE === 'live' && !env.SAP_LOG_API_URL) {
     throw new Error(
       'SAP_LOG_API_MODE is "live" but SAP_LOG_API_URL is empty.\n' +
-        '  Set SAP_LOG_API_URL to the ZEE_API_LOG endpoint, or\n' +
+        `  Set SAP_LOG_API_URL to the ${env.SAP_LOG_API_NAME} endpoint, or\n` +
         '  set SAP_LOG_API_MODE=mock (answered in-process) or off.',
+    );
+  }
+}
+
+function assertSapApiConfigured() {
+  if (env.SAP_API_KEY && env.SAP_API_KEY.length < 24) {
+    throw new Error(
+      'SAP_API_KEY is shorter than 24 characters.\n' +
+        '  It guards an endpoint on the internet; make it long and random, or leave it empty to switch the SAP API off.',
     );
   }
 }
 
 async function main() {
   assertExtractionConfigured();
+  assertSapApiConfigured();
   assertSapLogApiConfigured();
   await ensureDirectories();
 

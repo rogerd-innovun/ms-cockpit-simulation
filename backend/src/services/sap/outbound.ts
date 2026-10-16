@@ -7,6 +7,7 @@ import { childLogger } from '../../lib/logger.js';
 import { writeAudit } from '../audit.js';
 import { buildOutboundPayload, outboundBaseName } from './csv.js';
 import type { HeaderWithLines } from '../../domain/validation.js';
+import { notifyIntegration } from '../notifications/notify.js';
 
 const log = childLogger('sap-outbound');
 
@@ -209,6 +210,13 @@ export async function submitToSap(recordId: string): Promise<void> {
       message: 'APPROVED → NEEDS_REVIEW (outbound write failed)',
       actorName: 'sap-outbound',
     });
+    // FR-14.3 — nobody is watching a drop folder; Operations has to be told it cannot be written.
+    await notifyIntegration(
+      `outbound-write:${recordId}:${submission.attempt}`,
+      'The order file for a PO could not be written',
+      `The SAP drop folder rejected the file, so the order went back to review instead of reaching SAP: ${message}`,
+      recordId,
+    );
     log.error({ recordId, message }, 'outbound write failed');
   }
 }

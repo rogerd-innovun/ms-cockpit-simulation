@@ -1,4 +1,16 @@
-import type { AuthUser, RecordDetail, SapLogCall, SapLogState, WorklistRow } from './types';
+import type { UploadResult } from './batchUpload';
+import type {
+  AuthUser,
+  ChannelStatus,
+  DashboardData,
+  Inbox,
+  NotificationKind,
+  NotificationPreference,
+  RecordDetail,
+  SapLogCall,
+  SapLogState,
+  WorklistRow,
+} from './types';
 
 const TOKEN_KEY = 'cockpit.token';
 
@@ -87,13 +99,38 @@ export const api = {
 
   counts: () => request<Record<string, number>>('/records/counts'),
 
+  dashboard: (days: number) => request<DashboardData>(`/dashboard?days=${days}`),
+
+  notifications: (limit = 30) => request<Inbox>(`/notifications?limit=${limit}`),
+  markNotificationsRead: () => request<Inbox>('/notifications/read', { method: 'POST' }),
+  notificationPrefs: () => request<{ preferences: NotificationPreference[] }>('/notifications/preferences'),
+  setNotificationPref: (kind: NotificationKind, change: { inApp?: boolean; email?: boolean }) =>
+    request<{ preferences: NotificationPreference[] }>('/notifications/preferences', {
+      method: 'PUT',
+      body: JSON.stringify({ kind, ...change }),
+    }),
+  notificationChannels: () => request<ChannelStatus>('/notifications/channels'),
+  sendTestNotification: () => request<{ result: string; email: boolean; teams: boolean }>('/notifications/test', { method: 'POST' }),
+
+  /**
+   * The next record waiting for review, oldest first (the list itself is newest first),
+   * leaving out `excludeId`: the one just dealt with, which is still in review after a
+   * send-back. Null when nothing else is waiting.
+   */
+  nextForReview: async (excludeId: string): Promise<string | null> => {
+    const head = await api.list({ status: 'NEEDS_REVIEW', take: 1 });
+    if (head.total === 0) return null;
+    const oldest = await api.list({ status: 'NEEDS_REVIEW', take: 2, skip: Math.max(head.total - 2, 0) });
+    return [...oldest.rows].reverse().find((r) => r.id !== excludeId)?.id ?? null;
+  },
+
   detail: (id: string) => request<RecordDetail>(`/records/${id}`),
 
   upload: (file: File, vendorHint?: string) => {
     const form = new FormData();
     form.append('file', file);
     if (vendorHint) form.append('vendorHint', vendorHint);
-    return request<{ record: { id: string }; duplicates: unknown[] }>('/records', {
+    return request<UploadResult>('/records', {
       method: 'POST',
       body: form,
     });

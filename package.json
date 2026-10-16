@@ -14,7 +14,7 @@
     "dev:web": "npm -w frontend run dev",
     "sap:sim": "npm -w backend run sap:sim",
     "build": "npm -w backend run build && npm -w frontend run build",
-    "test": "npm -w backend run test"
+    "test": "npm -w backend run test && npm -w frontend run test"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

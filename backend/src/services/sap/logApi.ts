@@ -1,7 +1,8 @@
 /**
- * Client for ZEE_API_LOG, the SAP team's API keyed by Sales Order number.
+ * Client for the SAP team's API keyed by Sales Order number: ZEE_API_LOG, or another object
+ * they name in SAP_LOG_API_NAME (ZEE_TEST_PROG while testing).
  *
- * Contract as given by the SAP team: table IT_SALEORDERS, one row per Sales Order,
+ * Contract as given by the SAP team for ZEE_API_LOG: table IT_SALEORDERS, one row per Sales Order,
  * field VBELN (CHAR10). Nothing else is confirmed yet — not the endpoint, the
  * transport, the auth or the response — so every one of those is configuration
  * (see env.ts) and the response is stored exactly as SAP returned it rather than
@@ -14,8 +15,6 @@
  */
 import { env } from '../../config/env.js';
 
-export const LOG_API_NAME = 'ZEE_API_LOG';
-
 /** Namespace of a function module exposed as a web service without name mapping. */
 const RFC_NAMESPACE = 'urn:sap-com:document:sap:rfc:functions';
 
@@ -23,6 +22,8 @@ const RFC_NAMESPACE = 'urn:sap-com:document:sap:rfc:functions';
 const MAX_STORED_RESPONSE_CHARS = 64 * 1024;
 
 export interface LogApiConfig {
+  /** The SAP object called; see SAP_LOG_API_NAME. */
+  name: string;
   mode: 'off' | 'mock' | 'live';
   url: string;
   format: 'json' | 'soap';
@@ -34,6 +35,7 @@ export interface LogApiConfig {
 }
 
 export const logApiConfig = (): LogApiConfig => ({
+  name: env.SAP_LOG_API_NAME,
   mode: env.SAP_LOG_API_MODE,
   url: env.SAP_LOG_API_URL,
   format: env.SAP_LOG_API_FORMAT,
@@ -46,7 +48,7 @@ export const logApiConfig = (): LogApiConfig => ({
 
 /** One call, as stored in the audit trail and shown on the record. Holds no credentials. */
 export interface LogApiCall {
-  api: typeof LOG_API_NAME;
+  api: string;
   mode: 'mock' | 'live';
   format: 'json' | 'soap';
   endpoint: string | null;
@@ -66,6 +68,7 @@ const xmlEscape = (s: string) =>
 export function buildLogApiRequest(
   vbelns: string[],
   format: LogApiConfig['format'],
+  name: string = env.SAP_LOG_API_NAME,
 ): { body: string; headers: Record<string, string> } {
   if (format === 'soap') {
     const rows = vbelns.map((v) => `<item><VBELN>${xmlEscape(v)}</VBELN></item>`).join('');
@@ -79,7 +82,7 @@ export function buildLogApiRequest(
         '<?xml version="1.0" encoding="utf-8"?>' +
         `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:urn="${RFC_NAMESPACE}">` +
         '<soapenv:Header/><soapenv:Body>' +
-        `<urn:${LOG_API_NAME}><IT_SALEORDERS>${rows}</IT_SALEORDERS></urn:${LOG_API_NAME}>` +
+        `<urn:${name}><IT_SALEORDERS>${rows}</IT_SALEORDERS></urn:${name}>` +
         '</soapenv:Body></soapenv:Envelope>',
     };
   }
@@ -140,12 +143,12 @@ async function fetchCsrfToken(
 }
 
 export async function callLogApi(vbelns: string[], cfg: LogApiConfig = logApiConfig()): Promise<LogApiCall> {
-  if (cfg.mode === 'off') throw new Error(`${LOG_API_NAME} is switched off (SAP_LOG_API_MODE=off).`);
+  if (cfg.mode === 'off') throw new Error(`${cfg.name} is switched off (SAP_LOG_API_MODE=off).`);
 
-  const request = buildLogApiRequest(vbelns, cfg.format);
+  const request = buildLogApiRequest(vbelns, cfg.format, cfg.name);
   const started = Date.now();
   const base = {
-    api: LOG_API_NAME,
+    api: cfg.name,
     mode: cfg.mode,
     format: cfg.format,
     vbelns,
