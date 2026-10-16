@@ -125,6 +125,26 @@ describe('the address list', () => {
   });
 });
 
+describe('the trace of a turned-away call', () => {
+  it('reports the address used, the socket peer, the forwarded chain and the proxy count', async () => {
+    const { callerTrace } = await load({ TRUST_PROXY: '2' });
+    const trace = callerTrace({
+      ip: '::ffff:47.11.17.223',
+      socket: { remoteAddress: '::ffff:10.24.6.28' },
+      headers: { 'x-forwarded-for': '47.11.17.223, 172.70.1.2' },
+    } as never);
+    expect(trace).toEqual({ ip: '47.11.17.223', socket: '10.24.6.28', forwardedFor: '47.11.17.223, 172.70.1.2', trustProxy: 2 });
+  });
+
+  it('copes with no forwarded header and cuts a very long one', async () => {
+    const { callerTrace } = await load({});
+    const bare = callerTrace({ ip: '10.0.0.1', socket: {}, headers: {} } as never);
+    expect(bare).toMatchObject({ ip: '10.0.0.1', socket: '', forwardedFor: '' });
+    const long = callerTrace({ ip: '10.0.0.1', socket: {}, headers: { 'x-forwarded-for': 'a'.repeat(500) } } as never);
+    expect(long.forwardedFor).toHaveLength(200);
+  });
+});
+
 const basic = (user: string, pass: string) => 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64');
 
 describe('HTTP Basic login (what ABAP offers natively)', () => {
