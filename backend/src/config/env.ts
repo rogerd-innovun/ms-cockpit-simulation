@@ -166,6 +166,12 @@ const schema = z.object({
   /** The user name SAP puts in HTTP Basic login; the password is SAP_API_KEY. A Bearer or X-API-Key header needs no name. */
   SAP_API_USER: z.string().optional().default('sap'),
   /**
+   * POST /api/integration/sap/echo records, without interpreting it, whatever SAP sends (raw text, headers,
+   * a guess at the format), so a body in an unknown format can be seen and then mapped. It changes no order.
+   * It sits behind the same key; set to false to switch it off once the real format is handled.
+   */
+  SAP_API_CAPTURE: bool(true),
+  /**
    * How many proxies sit between the internet and this server, so the caller's real address
    * is read from X-Forwarded-For (Render: 3). With the wrong value an address allow-list
    * either blocks SAP or can be talked round, so it is set deliberately, never guessed.

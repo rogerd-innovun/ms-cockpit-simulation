@@ -6,6 +6,7 @@ import { prisma } from './db/client.js';
 import { authRouter } from './modules/auth/routes.js';
 import { dashboardRouter } from './modules/dashboard/routes.js';
 import { sapApiRouter } from './modules/sapApi/routes.js';
+import { sapCaptureRouter } from './modules/sapApi/capture.js';
 import { sapApiAuth } from './middleware/sapApiAuth.js';
 import { sapBodyErrors } from './middleware/sapBody.js';
 import { notificationsRouter } from './modules/notifications/routes.js';
@@ -42,6 +43,8 @@ export function createApp() {
   // Before the body is read: SAP's calls are checked for their key first, so an unauthorised caller
   // gets "unauthorised" however malformed its body is (and a bad body from SAP gets a real parse error).
   app.use('/api/integration/sap', sapApiAuth);
+  // SAP's capture door keeps the body raw, so it has to come before the JSON parser, which rejects anything else.
+  app.use('/api/integration/sap/echo', sapCaptureRouter);
   app.use(express.json({ limit: '2mb' }));
   app.use('/api/integration/sap', sapBodyErrors);
 
