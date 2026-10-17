@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../db/client.js';
 import { AppError, conflict, notFound } from '../../lib/errors.js';
 import { sapApiAuth } from '../../middleware/sapApiAuth.js';
+import { requireJsonBody } from '../../middleware/sapBody.js';
 import { OutboundFormatError, buildOutboundJson } from '../../services/sap/csv.js';
 import { ingestApiResult } from '../../services/sap/resultWatcher.js';
 
@@ -98,7 +99,7 @@ const resultBody = z
     path: ['soNumber'],
   });
 
-sapApiRouter.post('/results', async (req, res, next) => {
+sapApiRouter.post('/results', requireJsonBody, async (req, res, next) => {
   try {
     const b = resultBody.parse(squash(req.body));
     const outcome = await ingestApiResult({

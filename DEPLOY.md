@@ -183,9 +183,11 @@ flagging is the most interesting thing in the product.
 The cockpit has an HTTPS API for SAP's side: fetch the orders waiting for it, post back the Sales Order or the error. The SAP team needs only [docs/04-sap-api.md](docs/04-sap-api.md) and a key.
 
 1. Make a key (24+ random characters): `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
-2. In the Render dashboard, **Environment**, add `SAP_API_KEY` (that key) and `SAP_API_ALLOWED_IPS` (SAP's public address, e.g. `103.44.1.206`; ranges like `103.44.1.0/24` work too). `TRUST_PROXY=1` is already in `render.yaml`.
+2. In the Render dashboard, **Environment**, add `SAP_API_KEY` (that key) and `SAP_API_ALLOWED_IPS` (SAP's public address, e.g. `103.44.1.206`; ranges like `103.44.1.0/24` work too). `TRUST_PROXY=3` is already in `render.yaml` (Render puts three proxies in front of the app: one inside the container, Render's router and Cloudflare). To check it, send a call with a wrong key and read the `SAP API call with a missing or wrong key` line in the Render logs: `ip` must be the caller's public address, and `forwardedFor` shows the whole chain.
 3. **Turn the simulator off:** set `RUN_SAP_SIMULATOR` to `false`. With it on, the demo simulator answers every order itself, before real SAP can, and invents the Sales Order numbers.
 4. Give the SAP team the key (not by email if you can avoid it) and the base URL `https://<your-service>.onrender.com/api/integration/sap`. They can test with `GET /ping`. In ABAP the simplest is an ordinary HTTP login: user `sap` (change it with `SAP_API_USER`), the key as the password. A Bearer or `X-API-Key` header works too.
+
+After any change to `render.yaml`, look at **Environment** again: a Blueprint sync can put back the values written in the file, so confirm `RUN_SAP_SIMULATOR=false`, `TRUST_PROXY=3` and that `SAP_API_KEY` is still set.
 
 Notes: the address list is only as good as what SAP's calls look like from the internet (a corporate proxy may change it); with the list empty, the key is the only protection. Ten wrong keys from one address lock it out for ten minutes. Calls and answers appear in each record's audit trail like any other result.
 

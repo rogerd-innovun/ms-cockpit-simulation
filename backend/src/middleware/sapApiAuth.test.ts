@@ -201,7 +201,29 @@ describe('the whole app: the key is checked before the body is read', () => {
       .set('Content-Type', 'application/json')
       .send('sales_orders=4500123456');
     expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('BAD_REQUEST');
+    expect(res.body.error.code).toBe('BODY_NOT_JSON');
+    // names what arrived and what a right body looks like, instead of the parser's bare "Unexpected token"
+    expect(res.body.error.message).toContain('sales_orders=4500');
+    expect(res.body.error.message).toContain('"correlationId"');
+  });
+
+  it('a body sent as form fields is told to use JSON, not just that fields are missing', async () => {
+    const app = await fullApp();
+    const res = await request(app)
+      .post('/api/integration/sap/results')
+      .set('Authorization', basic('sap', KEY))
+      .type('form')
+      .send({ sales_orders: '4500123456' });
+    expect(res.status).toBe(415);
+    expect(res.body.error.code).toBe('UNSUPPORTED_MEDIA_TYPE');
+    expect(res.body.error.message).toContain('application/json');
+  });
+
+  it('an empty body still reaches the route, which names the missing fields', async () => {
+    const app = await fullApp();
+    const res = await request(app).post('/api/integration/sap/results').set('Authorization', basic('sap', KEY));
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 
   it('a wrong key costs one failed attempt, not two', async () => {

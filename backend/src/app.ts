@@ -7,6 +7,7 @@ import { authRouter } from './modules/auth/routes.js';
 import { dashboardRouter } from './modules/dashboard/routes.js';
 import { sapApiRouter } from './modules/sapApi/routes.js';
 import { sapApiAuth } from './middleware/sapApiAuth.js';
+import { sapBodyErrors } from './middleware/sapBody.js';
 import { notificationsRouter } from './modules/notifications/routes.js';
 import { recordsRouter } from './modules/records/routes.js';
 import { sapLogRouter } from './modules/sapLog/routes.js';
@@ -42,6 +43,7 @@ export function createApp() {
   // gets "unauthorised" however malformed its body is (and a bad body from SAP gets a real parse error).
   app.use('/api/integration/sap', sapApiAuth);
   app.use(express.json({ limit: '2mb' }));
+  app.use('/api/integration/sap', sapBodyErrors);
 
   /** NFR-5.1 — health checks for the pieces that fail silently. */
   app.get('/api/health', async (_req, res) => {
