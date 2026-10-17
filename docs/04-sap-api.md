@@ -106,6 +106,20 @@ An answer that arrives after we gave up waiting (our timeout is 60 minutes) is s
 
 Fetch every 1–5 minutes. There is no need to remember what you have already fetched: an order leaves the list when you answer it.
 
-## 5. From ABAP, in outline
+## 5. If your answer is not JSON yet: the capture address
+
+`POST /echo` takes **any** body (JSON, form fields, text, an internal table written out as text) and keeps it exactly as sent, without applying anything to any order. Point your program at it first, with the same login as everything else, and the cockpit side can then write the mapping from a real example instead of a description.
+
+```
+POST /api/integration/sap/echo
+200 {"received":true,"bytes":74,"kind":"delimited","delimiter":"tab","headers":{…},"preview":"VBELN\tBSTNK\t…"}
+```
+
+- `kind` is the cockpit's guess at the format: `json`, `form` (`name=value`, as in `sales_orders=…`, with each field's own kind listed), `delimited` (rows split by tab, `;`, `|` or `,`), `xml`, `text`, `binary` or `empty`. The reply also echoes the headers that matter (never the key) and the first 2,000 characters.
+- `GET /echo` returns the latest 20 captures, newest first, with the full text (up to 20,000 characters each). They are held in the server's memory, so a restart clears them; every capture is also written to the server log as `SAP API capture`.
+- It needs the key, like every other address here, and a body over 1 MB is refused. Switch it off with `SAP_API_CAPTURE=false` once the real format is handled.
+- Please send a few real rows, not one, and include any fields that are empty in your real data.
+
+## 6. From ABAP, in outline
 
 Create an HTTP client for the URL (SM59 or `cl_http_client=>create_by_url`), log in with `client->authenticate( username = 'sap' password = lv_key )` (or set `request->set_header_field( name = 'X-API-Key' value = lv_key )`), `set_method( 'GET' )` for the list and `'POST'` with `Content-Type: application/json` for answers, and (de)serialise with `/ui2/cl_json`. Keep the key in secure storage (SSFA / a secure parameter), not in the program.
