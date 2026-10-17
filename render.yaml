@@ -72,11 +72,15 @@ services:
         value: "0"           # nothing is rejected; set e.g. 0.15 to exercise the failure path
 
       # ---- the HTTPS API for SAP (FR-9.13), see docs/04-sap-api.md ----
-      # Render's proxy is one hop away; without this an address allow-list sees only the proxy.
+      # Three proxies sit in front of the app on Render (measured from the logs, 2026-10-16): a proxy
+      # inside the container, Render's router, then Cloudflare. X-Forwarded-For arrives as
+      # "<caller>, <Cloudflare>, <Render router>". With 1, an address allow-list sees Render's router
+      # instead of the caller. If Render changes its setup, the "SAP API call ..." warning in the logs
+      # shows the raw chain (forwardedFor) so the number can be corrected.
       # Add SAP_API_KEY (a long random secret) and SAP_API_ALLOWED_IPS (SAP's public address) in the
       # dashboard when SAP is ready to call. With no SAP_API_KEY the API is off.
       - key: TRUST_PROXY
-        value: "1"
+        value: "3"
 
       # ---- notifications (FR-14) ----
       # The in-app bell needs nothing. This is the address in the "Open" links of emails and

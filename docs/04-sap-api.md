@@ -89,7 +89,9 @@ Optional: `sapTimestamp`. Field names may be camelCase (`correlationId`) or ABAP
 |---|---|---|
 | `200 {"accepted":true,"applied":true}` | The order is now `SO_CREATED` (or `FAILED` with your error shown to the user) | Done |
 | `200 {"accepted":true,"applied":false,"duplicate":true}` | You already sent exactly this | Done; stop retrying |
-| `400` | The body is incomplete or malformed. "… is not valid JSON" means the body is not JSON at all (for example `sales_orders=4500…`), or the `Content-Type` says JSON while the body is something else | Send a JSON object as shown above, with `Content-Type: application/json`; retrying will not help |
+| `400` `VALIDATION_ERROR` | The body is JSON but incomplete or wrong (a missing `correlationId`, an unknown `status`, a `SUCCESS` with no `soNumber`). The message names the field | Fix the field named; retrying will not help |
+| `400` `BODY_NOT_JSON` | The `Content-Type` says JSON but the body is something else (for example `sales_orders=4500…`). The message shows how the body started and a correct example | Send one JSON object as shown above; retrying will not help |
+| `415` `UNSUPPORTED_MEDIA_TYPE` | The body was sent as form fields or plain text instead of JSON | Set `Content-Type: application/json` and send a JSON object |
 | `401` | Missing or wrong key | Check the key |
 | `403` | Calling from an address that is not allowed | Ask us to add your address |
 | `404 UNKNOWN_CORRELATION_ID` | No order has that ID. Kept on file and our operations team is alerted | Check the ID |

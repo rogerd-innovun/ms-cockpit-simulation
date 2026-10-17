@@ -167,7 +167,7 @@ const schema = z.object({
   SAP_API_USER: z.string().optional().default('sap'),
   /**
    * How many proxies sit between the internet and this server, so the caller's real address
-   * is read from X-Forwarded-For (Render: 1). With the wrong value an address allow-list
+   * is read from X-Forwarded-For (Render: 3). With the wrong value an address allow-list
    * either blocks SAP or can be talked round, so it is set deliberately, never guessed.
    */
   TRUST_PROXY: int(0),
